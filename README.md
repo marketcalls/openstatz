@@ -1,155 +1,131 @@
 # OpenStatz
 
-> A modern rebuild of [QuantStats](https://github.com/ranaroussi/quantstats): the same trusted
-> portfolio analytics, a fast pandas + NumPy core, and an optional modern web tearsheet — with
-> **enforced, bit-for-bit output parity** to the original library.
+OpenStatz is a modern rebuild of [QuantStats](https://github.com/ranaroussi/quantstats). It gives
+you the same portfolio analytics and the same numbers, plus an optional web tearsheet you can open
+in a browser.
 
-![OpenStatz tearsheet snapshot](docs/images/snapshot.png)
+![OpenStatz tearsheet](docs/images/snapshot.png)
 
-OpenStatz is **library-first**. One codebase, three ways to use it:
+## What you can do
 
-| Mode | Install | Usage |
-|---|---|---|
-| Library (drop-in) | `pip install openstatz` | `import openstatz as os; os.stats.sharpe(r)` |
-| Pandas extension | `pip install openstatz` | `os.extend_pandas(); r.sharpe()` |
-| Web tearsheet | `pip install "openstatz[app]"` | `openstatz serve` → http://127.0.0.1:8000 |
+- Use it in Python as a drop-in for QuantStats.
+- Open a web tearsheet in your browser. No Node.js needed.
+- Send your backtest returns (a CSV file or a pandas Series) and get a full report.
 
-The web app ships **pre-built inside the package**, so the `serve` command needs **no Node.js** — just Python.
+## Install
 
-> **Alias note:** the documented alias is `os` (`import openstatz as os`), which shadows Python's
-> stdlib `os` inside files that use it — `import os as _os` if you need both. The QuantStats `qs`
-> alias also works.
+```bash
+pip install openstatz          # the library
+pip install "openstatz[app]"   # also installs the web app and API
+```
 
-## Send your backtest to OpenStatz
+## Use it in Python
 
-Already have a strategy's returns from a backtest? Feed the pandas Series straight in — exactly
-like QuantStats:
+It works like QuantStats. You only change the import.
 
 ```python
 import openstatz as os
 
-returns   = my_backtest.returns        # a pd.Series of daily returns
+returns = my_backtest.returns                 # a pandas Series of daily returns
 benchmark = os.utils.download_returns("SPY")
 
-os.reports.html(returns, benchmark=benchmark, output="tearsheet.html")  # full HTML tearsheet
-os.reports.metrics(returns, mode="full", display=True)                  # printed metrics table
-os.extend_pandas(); returns.sharpe()                                    # pandas methods
+os.reports.html(returns, benchmark=benchmark, output="tearsheet.html")
+os.reports.metrics(returns, mode="full", display=True)
+
+os.extend_pandas()
+returns.sharpe()
 ```
 
-Or send it to the running server and get JSON back (metrics + chart series + tables):
+The `qs` alias also works. Note that the `os` alias hides Python's built-in `os` inside files that
+use it, so write `import os as _os` if you need both.
+
+## Open the web tearsheet
+
+```bash
+pip install "openstatz[app]"
+openstatz serve        # opens the API and UI at http://127.0.0.1:8000
+```
+
+To run on a different port:
+
+```bash
+openstatz serve --port 8200            # http://127.0.0.1:8200
+
+# or without installing the command:
+python -m openstatz serve --port 8200
+```
+
+In the browser you can:
+
+- Type a ticker and a benchmark, for example RELIANCE.NS and ^NSEI.
+- Or upload a CSV of your own returns. Columns: date, return, and an optional benchmark.
+  See [docs/example_returns.csv](docs/example_returns.csv) for the format.
+
+The page shows the cumulative return, drawdown, monthly and weekly heatmaps, yearly returns, the
+return distribution, and a full table of metrics. It has light and dark themes and a PDF export.
+
+## Send a backtest with the API
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/analyze \
   -H "Content-Type: application/json" \
-  -d '{"dates": ["2024-01-02", ...], "returns": {"Strategy": [0.001, ...]}, "benchmark": [0.0008, ...]}'
+  -d '{"dates": ["2024-01-02", "..."], "returns": {"Strategy": [0.001, "..."]}}'
 ```
 
-## The web tearsheet
+Endpoints:
+
+- `GET /api/health`
+- `POST /api/analyze` for your own returns
+- `POST /api/analyze/symbol` for a ticker the server fetches for you
+
+## The same numbers as QuantStats
+
+OpenStatz reuses the QuantStats math without changes, so the results are the same. A test suite
+checks this on every change. It runs the real QuantStats and OpenStatz side by side and fails if any
+number, table, or chart differs (to within 1e-9). It has been verified to match exactly, even on
+live market data.
 
 ```bash
-pip install "openstatz[app]"
-openstatz serve            # -> http://127.0.0.1:8000  (UI + API, no Node.js)
+python tests/parity/generate_fixtures.py   # build the reference output from QuantStats
+pytest tests/parity -q                       # run the check
 ```
 
-Two ways in, right from the browser:
+## Data sources
 
-- **Symbol** — type a ticker (e.g. `RELIANCE.NS`) + a benchmark (`^NSEI`) and period.
-- **Upload CSV** — drop in your backtest's returns: a `date, return[, benchmark]` CSV (values as
-  decimals, percents, or prices). See [`docs/example_returns.csv`](docs/example_returns.csv).
+`openstatz.providers` fetches returns for a symbol. yfinance is the default. OpenAlgo is an optional
+source for users on that platform.
 
-You get a sectioned tearsheet — **Overview · Performance · Risk · Monthly · Distribution ·
-Metrics** — with:
-
-- **Light & dark themes** (minimalist black-and-white shadcn styling; light by default).
-- Gradient-area **cumulative return** (with a thin blue benchmark overlay) and **underwater
-  drawdown** charts.
-- **Monthly** and year-selectable **weekly** return **heatmaps** (diverging green/red).
-- **EOY returns vs benchmark** bar chart, distribution, box plot, rolling Sharpe/vol/beta.
-- The full **81-metric** table, P&L color-coding throughout, and **vector PDF export**.
-
-`lightweight-charts` lives behind a single `<TimeSeriesChart>` adapter; the statistical panels are
-bespoke SVG for crisp PDF output.
-
-## API
-
-`pip install "openstatz[app]"` adds a FastAPI service (the adapter performs **no math** — it calls
-the library and serializes):
-
-- `GET  /api/health` → `{ status, version, numba }`
-- `POST /api/analyze` → analysis bundle from raw `{ dates, returns, benchmark? }`
-- `POST /api/analyze/symbol` → analysis bundle for a ticker fetched server-side via a provider
-
-`python scripts/export_openapi.py` writes the OpenAPI schema (for TypeScript type generation).
-
-## Data providers
-
-`openstatz.providers` is a small pluggable layer — `yfinance` (default) and an optional `OpenAlgo`
-provider:
+## Run old QuantStats code unchanged
 
 ```python
-from openstatz import providers
-r = providers.download_returns("SPY", period="5y")                  # yfinance
-# providers.register_provider(OpenAlgoProvider(api_key=..., host=...)); ... provider="openalgo"
+import openstatz.compat
+openstatz.compat.install_quantstats_shim()
+
+import quantstats as qs        # this is now OpenStatz
 ```
 
-## QuantStats compatibility
+## Project layout
 
-OpenStatz is a verified drop-in — **0 missing public symbols** (stats, utils, reports, plots, and
-the full `extend_pandas()` method map). To run unmodified QuantStats scripts:
-
-```python
-import openstatz.compat; openstatz.compat.install_quantstats_shim()
-import quantstats as qs        # this is OpenStatz
+```
+openstatz/         the library (drop-in for quantstats)
+  app/             optional FastAPI server and JSON serializers
+  app/static/      the built web UI, shipped inside the package
+app/               web UI source (React, Vite, Tailwind)
+tests/parity/      the check against QuantStats
 ```
 
-## Parity is enforced, not promised
+## Build the web UI (for contributors)
 
-`tests/parity/` is a golden-master gate: it snapshots reference QuantStats output on a corpus
-(single/multi-strategy, with/without benchmark, compounded/simple, daily/monthly) and asserts
-OpenStatz reproduces every metric to `rtol=1e-9`, every table, and every chart's source series.
-Verified bit-for-bit (0.00 difference) including on live market data.
+The shipped app is pre-built, so users need no Node.js. To rebuild it from source:
 
 ```bash
-python tests/parity/generate_fixtures.py   # re-baseline from a reference quantstats checkout
-pytest tests/parity -q                      # the gate (needs only openstatz + committed fixtures)
-```
-
-`QUANTSTATS_SRC` overrides the reference checkout path (default `D:/testing/quantstats`).
-
-## Performance
-
-Compute stays on **pandas** for free parity, with vectorized **NumPy** kernels accelerating a few
-loop-shaped hot spots (e.g. ~11× on the Monte Carlo per-column max-drawdown), each gated by a
-parity test. Numba is intentionally deferred — it creates NumPy-compatibility friction; the pure
-path is the default and the library installs everywhere.
-
-## Layout
-
-```
-openstatz/            the library (drop-in for quantstats)
-  app/                optional FastAPI adapter + serializers ([app] extra) — no math
-  app/static/         the pre-built web UI shipped in the wheel (no Node at runtime)
-app/                  web UI source (Vite + React + TS + Tailwind/shadcn)
-tests/parity/         golden-master parity gate
-scripts/              OpenAPI export, etc.
-```
-
-## Development
-
-```bash
-uv pip install -e ".[dev,app]"
-pytest tests -q                       # unit + parity + API
-
-# Web UI (contributors only — needs Node). Dev server proxies /api to :8000:
-cd app && npm ci && npm run dev       # http://localhost:5173
-
-# Rebuild the shipped bundle:
-cd app && npm run build && cp -r dist/* ../openstatz/app/static/
+cd app && npm ci && npm run build
+cp -r dist/* ../openstatz/app/static/
 ```
 
 ## License
 
-**Apache-2.0** — see [`LICENSE.txt`](./LICENSE.txt) and [`NOTICE`](./NOTICE). The portfolio-analytics
-implementation is reused verbatim from QuantStats (© 2019–2025 Ran Aroussi, Apache-2.0); OpenStatz
-additions © 2026 contributors. See [`2026-rebuild-architecture.md`](./2026-rebuild-architecture.md)
-for the full design and roadmap.
+Apache 2.0. See [LICENSE.txt](./LICENSE.txt) and [NOTICE](./NOTICE).
+
+OpenStatz is built on QuantStats (Copyright 2019 to 2025, Ran Aroussi, Apache 2.0). The portfolio
+math is reused without changes. Thanks to Ran Aroussi and the QuantStats contributors.
