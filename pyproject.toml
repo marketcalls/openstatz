@@ -94,6 +94,13 @@ Repository = "https://github.com/ranaroussi/quantstats"
 path = "openstatz/version.py"
 pattern = 'version = "(?P<version>[^"]+)"'
 
+# Ship the pre-built web UI inside the wheel/sdist so `openstatz serve` works
+# with no Node.js. Built via: (cd app && npm ci && npm run build) then copy
+# app/dist -> openstatz/app/static. `artifacts` force-includes those files in
+# every build target even though they are gitignored.
+[tool.hatch.build]
+artifacts = ["openstatz/app/static/**/*"]
+
 [tool.hatch.build.targets.sdist]
 include = [
     "/openstatz",
@@ -106,9 +113,6 @@ include = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["openstatz"]
-# Ship the pre-built web UI inside the wheel so `openstatz serve` works with no
-# Node.js. Built via: (cd app && npm ci && npm run build) then copy app/dist ->
-# openstatz/app/static. `artifacts` force-includes it even though it's gitignored.
 artifacts = ["openstatz/app/static/**/*"]
 
 [tool.pytest.ini_options]

@@ -4,7 +4,7 @@ OpenStatz is a modern rebuild of [QuantStats](https://github.com/ranaroussi/quan
 you the same portfolio analytics and the same numbers, plus an optional web tearsheet you can open
 in a browser.
 
-![OpenStatz tearsheet](docs/images/snapshot.png)
+![OpenStatz tearsheet](https://raw.githubusercontent.com/marketcalls/openstatz/main/docs/images/snapshot.png)
 
 ## What you can do
 
