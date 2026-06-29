@@ -1,0 +1,128 @@
+@import "tailwindcss";
+@import "./theme/tokens.css";
+
+/* Map tokens into Tailwind utilities (`bg-panel`, `text-muted`, `border-hair`,
+ * `text-pnl-pos`, `bg-accent`, …). They resolve to theme variables and swap
+ * with the `.dark` class. */
+@theme {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-hair: var(--border);
+  --color-hair-strong: var(--border-strong);
+  --color-ink: var(--text);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+  --color-gold: var(--gold);
+  --color-label: var(--label);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-pnl-pos: var(--pnl-pos);
+  --color-pnl-neg: var(--pnl-neg);
+
+  /* System UI fonts — minimalist, matching OpenAlgo (no web fonts). */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "rlig" 1, "calt" 1;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Heading utility — clean bold sans (no serif). */
+.serif {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Tabular monospaced numerals — the signature of a financial UI. */
+.nums {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+}
+
+/* Subtle uppercase tracked micro-label, muted. */
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--label);
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+section[id] {
+  scroll-margin-top: 96px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@media print {
+  /* Preserve the on-screen theme (backgrounds, P&L colors) in the PDF. */
+  html,
+  body,
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  html,
+  body {
+    background: var(--bg) !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .card,
+  section[id] {
+    break-inside: avoid;
+  }
+}

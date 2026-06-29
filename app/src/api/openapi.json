@@ -1,0 +1,689 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenStatz API",
+    "description": "Portfolio analytics \u2014 library core served as JSON.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analyze": {
+      "post": {
+        "summary": "Analyze",
+        "operationId": "analyze_api_analyze_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyzeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analyze/symbol": {
+      "post": {
+        "summary": "Analyze Symbol",
+        "operationId": "analyze_symbol_api_analyze_symbol_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SymbolRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnalysisResponse": {
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/MetricsTable"
+          },
+          "series": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/components/schemas/SeriesPoint"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Series"
+          },
+          "tables": {
+            "$ref": "#/components/schemas/Tables"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meta",
+          "metrics",
+          "series",
+          "tables"
+        ],
+        "title": "AnalysisResponse"
+      },
+      "AnalyzeRequest": {
+        "properties": {
+          "dates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dates",
+            "description": "Shared date axis (ISO 8601 strings)."
+          },
+          "returns": {
+            "additionalProperties": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Returns",
+            "description": "Strategy name -> per-date returns (decimal, not %)."
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark",
+            "description": "Optional benchmark returns aligned to `dates`."
+          },
+          "benchmark_name": {
+            "type": "string",
+            "title": "Benchmark Name",
+            "description": "Label for the benchmark column.",
+            "default": "Benchmark"
+          },
+          "rf": {
+            "type": "number",
+            "title": "Rf",
+            "description": "Risk-free rate (annual, decimal).",
+            "default": 0.0
+          },
+          "compounded": {
+            "type": "boolean",
+            "title": "Compounded",
+            "description": "Compound returns (vs simple sum).",
+            "default": true
+          },
+          "periods_per_year": {
+            "type": "integer",
+            "title": "Periods Per Year",
+            "description": "Annualization factor.",
+            "default": 252
+          },
+          "rolling_window": {
+            "type": "integer",
+            "minimum": 2.0,
+            "title": "Rolling Window",
+            "description": "Rolling-metric window length.",
+            "default": 126
+          }
+        },
+        "type": "object",
+        "required": [
+          "dates",
+          "returns"
+        ],
+        "title": "AnalyzeRequest",
+        "description": "One or more return series on a shared date axis, plus optional benchmark.\n\nA single key in ``returns`` is a single-strategy analysis; multiple keys is a\nmulti-strategy comparison."
+      },
+      "DrawdownRow": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "title": "Start"
+          },
+          "valley": {
+            "type": "string",
+            "title": "Valley"
+          },
+          "end": {
+            "type": "string",
+            "title": "End"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days"
+          },
+          "max_drawdown": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown"
+          },
+          "drawdown_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawdown Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "valley",
+          "end"
+        ],
+        "title": "DrawdownRow"
+      },
+      "DrawdownTable": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/DrawdownRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "DrawdownTable"
+      },
+      "EoyRow": {
+        "properties": {
+          "year": {
+            "type": "string",
+            "title": "Year"
+          },
+          "strategy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy"
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year"
+        ],
+        "title": "EoyRow"
+      },
+      "EoyTable": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/EoyRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "EoyTable"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "numba": {
+            "type": "boolean",
+            "title": "Numba"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version",
+          "numba"
+        ],
+        "title": "HealthResponse"
+      },
+      "HeatmapCell": {
+        "properties": {
+          "year": {
+            "type": "string",
+            "title": "Year"
+          },
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "month",
+          "value"
+        ],
+        "title": "HeatmapCell"
+      },
+      "Meta": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "start": {
+            "type": "integer",
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "title": "End"
+          },
+          "n_periods": {
+            "type": "integer",
+            "title": "N Periods"
+          },
+          "rf": {
+            "type": "number",
+            "title": "Rf"
+          },
+          "compounded": {
+            "type": "boolean",
+            "title": "Compounded"
+          },
+          "periods_per_year": {
+            "type": "integer",
+            "title": "Periods Per Year"
+          },
+          "has_benchmark": {
+            "type": "boolean",
+            "title": "Has Benchmark"
+          }
+        },
+        "type": "object",
+        "required": [
+          "columns",
+          "start",
+          "end",
+          "n_periods",
+          "rf",
+          "compounded",
+          "periods_per_year",
+          "has_benchmark"
+        ],
+        "title": "Meta"
+      },
+      "MetricRow": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Values"
+          },
+          "display": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Display"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "values",
+          "display"
+        ],
+        "title": "MetricRow"
+      },
+      "MetricsTable": {
+        "properties": {
+          "columns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Columns"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/MetricRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "columns",
+          "rows"
+        ],
+        "title": "MetricsTable"
+      },
+      "MonthlyHeatmap": {
+        "properties": {
+          "years": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Years"
+          },
+          "months": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Months"
+          },
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/HeatmapCell"
+            },
+            "type": "array",
+            "title": "Cells"
+          }
+        },
+        "type": "object",
+        "required": [
+          "years",
+          "months",
+          "cells"
+        ],
+        "title": "MonthlyHeatmap"
+      },
+      "SeriesPoint": {
+        "properties": {
+          "time": {
+            "type": "integer",
+            "title": "Time"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "time",
+          "value"
+        ],
+        "title": "SeriesPoint"
+      },
+      "SymbolRequest": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol",
+            "description": "Ticker, e.g. 'RELIANCE.NS', 'SPY'."
+          },
+          "benchmark_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Symbol",
+            "description": "Optional benchmark ticker, e.g. '^NSEI'."
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "description": "Registered data provider name.",
+            "default": "yfinance"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period",
+            "description": "History period passed to the provider.",
+            "default": "5y"
+          },
+          "rf": {
+            "type": "number",
+            "title": "Rf",
+            "description": "Risk-free rate (annual, decimal).",
+            "default": 0.0
+          },
+          "compounded": {
+            "type": "boolean",
+            "title": "Compounded",
+            "default": true
+          },
+          "periods_per_year": {
+            "type": "integer",
+            "title": "Periods Per Year",
+            "default": 252
+          },
+          "rolling_window": {
+            "type": "integer",
+            "minimum": 2.0,
+            "title": "Rolling Window",
+            "default": 126
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol"
+        ],
+        "title": "SymbolRequest",
+        "description": "Analyze a ticker fetched server-side via a data provider (e.g. yfinance)."
+      },
+      "Tables": {
+        "properties": {
+          "monthly_heatmap": {
+            "$ref": "#/components/schemas/MonthlyHeatmap"
+          },
+          "eoy": {
+            "$ref": "#/components/schemas/EoyTable"
+          },
+          "worst_drawdowns": {
+            "$ref": "#/components/schemas/DrawdownTable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "monthly_heatmap",
+          "eoy",
+          "worst_drawdowns"
+        ],
+        "title": "Tables"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

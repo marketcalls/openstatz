@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.benchmarks/
+.hypothesis/
+
+# Node / web UI
+app/node_modules/
+app/dist/
+app/.vite/
+
+# Built UI copied into the package (force-included in the wheel via pyproject
+# [tool.hatch.build.targets.wheel] artifacts; rebuilt from app/ at release time)
+openstatz/app/static/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NOTE: tests/parity/fixtures/*.pkl ARE committed on purpose — they are the
+# golden master the CI parity gate runs against.

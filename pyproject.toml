@@ -1,0 +1,164 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "openstatz"
+dynamic = ["version"]
+description = "Portfolio analytics for quants — a modern rebuild of QuantStats with a fast pandas+Numba core and an optional web UI"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [
+    { name = "OpenStatz contributors" },
+    { name = "Ran Aroussi", email = "ran@aroussi.com" },
+]
+keywords = [
+    "quant",
+    "algotrading",
+    "algorithmic-trading",
+    "quantitative-trading",
+    "quantitative-analysis",
+    "algo-trading",
+    "visualization",
+    "plotting",
+    "portfolio",
+    "finance",
+]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Development Status :: 4 - Beta",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "pandas>=1.5.0",
+    "numpy>=1.24.0",
+    "scipy>=1.11.0",
+    "matplotlib>=3.7.0",
+    "seaborn>=0.13.0",
+    "tabulate>=0.9.0",
+    "yfinance>=0.2.40",
+    "python-dateutil>=2.8.0",
+]
+
+[project.optional-dependencies]
+# NOTE: Numba acceleration is intentionally omitted for now (compatibility
+# issues with current NumPy). The kernels in openstatz/_kernels.py are pure
+# NumPy and need no extra dependency.
+# Optional FastAPI service layer — `pip install openstatz[app]`.
+app = [
+    "fastapi>=0.110.0",
+    "pydantic>=2.6.0",
+    "uvicorn>=0.29.0",
+    "httpx>=0.27.0",
+]
+plotly = [
+    "plotly>=5.0.0",
+]
+docs = [
+    "mkdocs-material>=9.5.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-benchmark>=4.0.0",
+    "hypothesis>=6.90.0",
+    "pyright>=1.1.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+openstatz = "openstatz.app.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/ranaroussi/quantstats"
+Documentation = "https://github.com/ranaroussi/quantstats"
+Repository = "https://github.com/ranaroussi/quantstats"
+
+[tool.hatch.version]
+path = "openstatz/version.py"
+pattern = 'version = "(?P<version>[^"]+)"'
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/openstatz",
+    "/README.md",
+    "/LICENSE.txt",
+    "/NOTICE",
+    "/CHANGELOG.md",
+    "/2026-rebuild-architecture.md",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["openstatz"]
+# Ship the pre-built web UI inside the wheel so `openstatz serve` works with no
+# Node.js. Built via: (cd app && npm ci && npm run build) then copy app/dist ->
+# openstatz/app/static. `artifacts` force-includes it even though it's gitignored.
+artifacts = ["openstatz/app/static/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short -p no:libtmux"
+markers = [
+    "parity: golden-master parity tests against reference quantstats",
+]
+
+[tool.pyright]
+include = ["openstatz"]
+exclude = ["tests", "app"]
+pythonVersion = "3.10"
+typeCheckingMode = "basic"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+# The compute core is vendored verbatim from QuantStats and kept byte-faithful
+# for numerical parity (see tests/parity). We lint only OpenStatz-authored code
+# (_kernels, _context, app/, __init__) — not the vendored modules.
+extend-exclude = [
+    "openstatz/stats.py",
+    "openstatz/utils.py",
+    "openstatz/reports.py",
+    "openstatz/plots.py",
+    "openstatz/_montecarlo.py",
+    "openstatz/_compat.py",
+    "openstatz/_numpy_compat.py",
+    "openstatz/_plotting",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # function call in default argument
+    "SIM108", # ternary operator
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["openstatz"]

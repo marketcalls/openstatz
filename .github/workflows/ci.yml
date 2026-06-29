@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install (library + dev extras)
+        run: uv pip install --system -e ".[dev,app]"
+
+      - name: Lint
+        run: ruff check openstatz
+
+      - name: Parity gate (golden master)
+        # Fixtures are committed; the parity suite needs only openstatz.
+        run: pytest tests/parity -q
+
+      - name: Unit tests
+        run: pytest tests -q
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install web deps
+        working-directory: app
+        run: npm ci
+      - name: Typecheck + build
+        working-directory: app
+        run: npm run build

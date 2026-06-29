@@ -1,0 +1,72 @@
+/* OpenStatz design tokens — minimalist black & white shadcn/ui, matching the
+ * OpenAlgo theme (neutral base, the same HSL values, `.dark` class). The only
+ * chromatic colors are the trading profit/loss greens & reds.
+ *
+ * Default is light. Colors are stored under the semantic names the components
+ * and charts already use, tuned so both themes read pleasantly: a faint gray
+ * page behind white cards in light, gently elevated cards on near-black in dark. */
+
+:root {
+  --bg: hsl(240 6% 97.5%); /* faint gray page */
+  --panel: hsl(0 0% 100%); /* white cards lift off the page */
+  --panel-2: hsl(240 5% 96%);
+
+  --border: hsl(240 6% 90%);
+  --border-strong: hsl(240 5% 80%);
+  --grid: hsl(240 6% 92%);
+
+  --text: hsl(240 10% 3.9%); /* foreground */
+  --text-muted: hsl(240 3.8% 46.1%); /* muted-foreground */
+  --text-faint: hsl(240 4% 64%);
+
+  --accent: hsl(240 5.9% 10%); /* primary (near-black) */
+  --accent-ink: hsl(0 0% 98%);
+  --accent-soft: hsl(240 5% 10% / 0.06);
+
+  /* gold/label neutralized -> muted (no warm accent) */
+  --gold: hsl(240 3.8% 46.1%);
+  --label: hsl(240 3.8% 46.1%);
+
+  --pnl-pos: hsl(142 72% 33%); /* profit */
+  --pnl-neg: hsl(0 74% 50%); /* loss */
+  --pnl-pos-soft: hsl(142 72% 33% / 0.12);
+  --pnl-neg-soft: hsl(0 74% 50% / 0.1);
+
+  --heat-neg: hsl(0 74% 50%);
+  --heat-mid: hsl(0 0% 100%);
+  --heat-pos: hsl(142 72% 33%);
+
+  --benchmark: hsl(217 91% 52%); /* thin blue benchmark line */
+}
+
+.dark {
+  --bg: hsl(240 10% 3.9%);
+  --panel: hsl(240 9% 6.5%); /* gently elevated card */
+  --panel-2: hsl(240 4% 12%);
+
+  --border: hsl(240 4% 16%);
+  --border-strong: hsl(240 4% 30%);
+  --grid: hsl(240 4% 13%);
+
+  --text: hsl(0 0% 98%);
+  --text-muted: hsl(240 5% 65%);
+  --text-faint: hsl(240 4% 48%);
+
+  --accent: hsl(0 0% 98%); /* primary (near-white) */
+  --accent-ink: hsl(240 5.9% 10%);
+  --accent-soft: hsl(0 0% 98% / 0.08);
+
+  --gold: hsl(240 5% 65%);
+  --label: hsl(240 5% 65%);
+
+  --pnl-pos: hsl(142 69% 58%);
+  --pnl-neg: hsl(0 91% 71%);
+  --pnl-pos-soft: hsl(142 69% 58% / 0.14);
+  --pnl-neg-soft: hsl(0 91% 71% / 0.14);
+
+  --heat-neg: hsl(0 91% 71%);
+  --heat-mid: hsl(240 10% 7%);
+  --heat-pos: hsl(142 69% 58%);
+
+  --benchmark: hsl(217 91% 65%);
+}
