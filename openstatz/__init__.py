@@ -25,10 +25,30 @@ __author__ = "Ran Aroussi (QuantStats) / OpenStatz contributors"
 
 from . import plots, providers, reports, stats, utils
 
-__all__ = ["stats", "plots", "reports", "utils", "providers", "extend_pandas"]
+__all__ = [
+    "stats",
+    "plots",
+    "reports",
+    "utils",
+    "providers",
+    "extend_pandas",
+    "dashboard",
+]
 
 # try automatic matplotlib inline
 utils._in_notebook(matplotlib_inline=True)
+
+
+def __getattr__(name):
+    # `openstatz.dashboard(...)` renders the modern web UI to a self-contained
+    # offline HTML file. Resolved lazily so a plain `import openstatz` does not
+    # pull in the app subpackage (it has no FastAPI dependency, but the core
+    # library deliberately never imports app/ at module load).
+    if name == "dashboard":
+        from .app.static_report import dashboard
+
+        return dashboard
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def extend_pandas():

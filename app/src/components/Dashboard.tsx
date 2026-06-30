@@ -4,6 +4,7 @@ import { analyze, analyzeSymbol, health } from "../api/client";
 import type { SeriesPoint, AnalyzeRequest } from "../api/types";
 import type { ReactNode } from "react";
 import { parseReturnsCsv } from "../lib/parseCsv";
+import { EMBEDDED_DATA, EMBEDDED_HEALTH, IS_STATIC_REPORT } from "../lib/embedded";
 import { useTheme } from "../theme/ThemeProvider";
 import { Card } from "./ui/Card";
 import { SectionHeader } from "./SectionHeader";
@@ -165,6 +166,8 @@ export function Dashboard() {
     benchmark: "^NSEI",
     period: "5y",
   });
+  // Static-report mode: data is baked into the file, so never hit the network —
+  // seed the query with the embedded bundle and disable fetching.
   const q = useQuery({
     queryKey: ["analyze", reqKey(request)],
     queryFn: () =>
@@ -176,10 +179,21 @@ export function Dashboard() {
           })
         : analyze(request.payload),
     retry: false,
+    enabled: !IS_STATIC_REPORT,
+    initialData: EMBEDDED_DATA,
   });
-  const h = useQuery({ queryKey: ["health"], queryFn: health, retry: false });
+  const h = useQuery({
+    queryKey: ["health"],
+    queryFn: health,
+    retry: false,
+    enabled: !IS_STATIC_REPORT,
+    initialData: EMBEDDED_HEALTH,
+  });
 
-  const bar = <InputBar current={request} onSubmit={setRequest} busy={q.isFetching} />;
+  // No input bar in a static report — there's no backend to re-query.
+  const bar = IS_STATIC_REPORT ? null : (
+    <InputBar current={request} onSubmit={setRequest} busy={q.isFetching} />
+  );
 
   if (q.isLoading) {
     return (

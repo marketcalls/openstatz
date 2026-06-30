@@ -9,7 +9,9 @@ in a browser.
 ## What you can do
 
 - Use it in Python as a drop-in for QuantStats.
-- Open a web tearsheet in your browser. No Node.js needed.
+- Generate the modern web tearsheet as a single offline HTML file. It works on a plain
+  `pip install openstatz`, with no server and no Node.js.
+- Or run the same dashboard as a live server (`openstatz serve`) to type tickers and upload CSVs.
 - Send your backtest returns (a CSV file or a pandas Series) and get a full report.
 
 ## Install
@@ -39,7 +41,32 @@ returns.sharpe()
 The `qs` alias also works. Note that the `os` alias hides Python's built-in `os` inside files that
 use it, so write `import os as _os` if you need both.
 
-## Open the web tearsheet
+## Two ways to make a tearsheet
+
+Both work on a plain `pip install openstatz`, with no `[app]` extra, no server, and no Node.js.
+
+**Modern tearsheet.** The same dashboard as `openstatz serve`, written to a single self-contained
+HTML file with the analysis baked in (charts, heatmaps, metrics, light and dark themes, PDF export):
+
+```python
+import openstatz as os
+
+os.dashboard(returns, benchmark=benchmark, output="report.html")
+```
+
+The file embeds the data and inlines the JS/CSS, so you can email it or commit it and it just opens.
+
+**Classic tearsheet.** The original QuantStats-style report (matplotlib charts in a static HTML
+template). Use this when you want the familiar QuantStats look or exact upstream parity:
+
+```python
+import openstatz as os
+
+os.reports.html(returns, benchmark=benchmark, output="tearsheet.html")
+os.reports.metrics(returns, mode="full", display=True)
+```
+
+## Open the web tearsheet (live server)
 
 ```bash
 pip install "openstatz[app]"

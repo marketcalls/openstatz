@@ -27,3 +27,6 @@ Thumbs.db
 
 # NOTE: tests/parity/fixtures/*.pkl ARE committed on purpose — they are the
 # golden master the CI parity gate runs against.
+
+# TypeScript incremental build cache
+app/*.tsbuildinfo
