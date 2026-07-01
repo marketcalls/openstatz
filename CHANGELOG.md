@@ -3,6 +3,15 @@
 All notable changes to OpenStatz are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.3.1]
+
+### Changed
+- Compare: the head-to-head table uses "Serenity Index" instead of "Recovery Factor", which is
+  blank for multi-strategy input.
+
+### Added
+- Tag-triggered PyPI release workflow using Trusted Publishing (no stored token); see RELEASING.md.
+
 ## [0.3.0]
 
 ### Added
