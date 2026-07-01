@@ -1,0 +1,82 @@
+name: Release
+
+# Publishes to PyPI when a version tag is pushed, e.g.:
+#   git tag v0.3.1 && git push origin v0.3.1
+#
+# Uses PyPI Trusted Publishing (OIDC) - there is NO API token to store. One-time
+# setup on PyPI: project openstatz -> Settings -> Publishing -> add a GitHub
+# trusted publisher (owner: marketcalls, repo: openstatz, workflow: release.yml).
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Build the web UI
+        working-directory: app
+        run: |
+          npm ci
+          npm run build
+
+      - name: Bundle the UI into the package
+        run: |
+          rm -rf openstatz/app/static
+          mkdir -p openstatz/app/static
+          cp -r app/dist/* openstatz/app/static/
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install and test (release gate)
+        run: |
+          python -m pip install --upgrade pip build
+          pip install -e ".[dev,app]"
+          pytest tests -q
+
+      - name: Build sdist + wheel
+        run: python -m build
+
+      - name: Verify the wheel ships the web UI
+        run: |
+          python - <<'PY'
+          import glob, zipfile
+          whl = glob.glob("dist/*.whl")[0]
+          names = zipfile.ZipFile(whl).namelist()
+          n = sum("openstatz/app/static/" in x for x in names)
+          assert n >= 4, f"web UI missing from wheel ({n} static files)"
+          print(f"OK: wheel ships {n} UI files")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # required for Trusted Publishing (OIDC)
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

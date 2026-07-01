@@ -86,7 +86,7 @@ export const COMPARE_METRICS: CompareSpec[] = [
   { name: "Win Days", metric: "Win Days", fmt: "pct", better: "up" },
   { name: "Profit Factor", metric: "Profit Factor", fmt: "num", better: "up" },
   { name: "Ulcer Index", metric: "Ulcer Index", fmt: "num", better: "down" },
-  { name: "Recovery Factor", metric: "Recovery Factor", fmt: "num", better: "up" },
+  { name: "Serenity Index", metric: "Serenity Index", fmt: "num", better: "up" },
 ];
 
 export const GROUPS: Record<string, StatSpec[]> = {
