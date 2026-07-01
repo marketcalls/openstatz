@@ -119,6 +119,22 @@ def serialize_metrics(
     if rename:
         df = df.rename(columns=rename)
 
+    # Safety net: never let duplicate column names slip through — indexing a
+    # duplicated label returns a Series, which would stringify into the cells.
+    if df.columns.duplicated().any():
+        seen: dict[str, int] = {}
+        new_cols = []
+        for c in df.columns:
+            c = str(c)
+            if c in seen:
+                seen[c] += 1
+                new_cols.append(f"{c} ({seen[c]})")
+            else:
+                seen[c] = 0
+                new_cols.append(c)
+        df = df.copy()
+        df.columns = new_cols
+
     columns = [str(c) for c in df.columns]
     rows = []
     for label, row in df.iterrows():
@@ -349,6 +365,13 @@ def serialize_analysis(
     if isinstance(returns, pd.DataFrame) and returns.shape[1] >= 1:
         primary = returns[returns.columns[0]]
 
+    # Guard against a strategy and benchmark that share a name (e.g. both named
+    # "Close" from download_returns): that would collide into duplicate columns.
+    if benchmark is not None:
+        prim_name = str(primary.name) if isinstance(primary, pd.Series) else None
+        if str(benchmark.name) == str(prim_name) or benchmark.name is None:
+            benchmark = benchmark.rename("Benchmark" if prim_name != "Benchmark" else "Benchmark (bm)")
+
     start = returns.index[0]
     end = returns.index[-1]
 
@@ -379,5 +402,79 @@ def serialize_analysis(
             "weekly_heatmap": serialize_weekly_heatmap(primary, compounded=compounded),
             "eoy": serialize_eoy(primary, benchmark, compounded=compounded),
             "worst_drawdowns": serialize_worst_drawdowns(primary),
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Multi-strategy comparison
+# ---------------------------------------------------------------------------
+
+def serialize_comparison(
+    returns: pd.DataFrame,
+    *,
+    rf: float = 0.0,
+    compounded: bool = True,
+    periods_per_year: int = 252,
+    rolling_window: int = 126,
+) -> dict[str, Any]:
+    """Compare several strategies side by side.
+
+    Returns the full metrics table (one column per strategy) plus overlaid
+    cumulative / drawdown / rolling-Sharpe series, so the UI can show which
+    strategy is better on each measure. `returns` must be a DataFrame with one
+    column per strategy (distinct names).
+    """
+    from openstatz import stats
+    from openstatz._context import ReturnsContext
+
+    if isinstance(returns, pd.Series):
+        returns = returns.to_frame()
+    # Make the column names distinct strings.
+    cols = [str(c) for c in returns.columns]
+    seen: dict[str, int] = {}
+    uniq = []
+    for c in cols:
+        if c in seen:
+            seen[c] += 1
+            uniq.append(f"{c} ({seen[c]})")
+        else:
+            seen[c] = 0
+            uniq.append(c)
+    returns = returns.copy()
+    returns.columns = uniq
+
+    cumulative: dict[str, list] = {}
+    drawdown: dict[str, list] = {}
+    rolling_sharpe: dict[str, list] = {}
+    for col in returns.columns:
+        s = returns[col]
+        ctx = ReturnsContext.from_returns(
+            s, rf=rf, periods_per_year=periods_per_year, compounded=compounded
+        )
+        cumulative[col] = series_to_points(ctx.cumulative)
+        drawdown[col] = series_to_points(ctx.drawdown)
+        rs = _safe(lambda c=ctx: stats.rolling_sharpe(c.returns, rolling_period=rolling_window))
+        if isinstance(rs, pd.Series):
+            rolling_sharpe[col] = series_to_points(rs)
+
+    return {
+        "meta": {
+            "columns": list(returns.columns),
+            "start": _epoch_seconds(returns.index[0]),
+            "end": _epoch_seconds(returns.index[-1]),
+            "n_periods": int(len(returns)),
+            "rf": rf,
+            "compounded": compounded,
+            "periods_per_year": periods_per_year,
+            "has_benchmark": False,
+        },
+        "metrics": serialize_metrics(
+            returns, None, rf=rf, compounded=compounded, periods_per_year=periods_per_year
+        ),
+        "series": {
+            "cumulative": cumulative,
+            "drawdown": drawdown,
+            "rolling_sharpe": rolling_sharpe,
         },
     }

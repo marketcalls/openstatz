@@ -696,6 +696,10 @@ def download_returns(ticker, period="max", proxy=None):
     # Download data and calculate returns
     df = safe_yfinance_download(proxy=proxy, **params)["Close"].pct_change(fill_method=None)  # type: ignore
     df = df.fillna(0).tz_localize(None)
+    # Name the series after the ticker (not "Close"), so a strategy and its
+    # benchmark don't collide into duplicate columns downstream.
+    if isinstance(df, _pd.Series) and isinstance(ticker, str):
+        df = df.rename(ticker)
     return df
 
 

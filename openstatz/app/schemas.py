@@ -51,6 +51,31 @@ class SymbolRequest(BaseModel):
     rolling_window: int = Field(126, ge=2)
 
 
+class CompareSymbolsRequest(BaseModel):
+    """Compare several tickers fetched server-side (e.g. ['AAPL', 'NVDA'])."""
+
+    symbols: list[str] = Field(..., min_length=2, description="Tickers to compare.")
+    provider: str = Field("yfinance")
+    period: str = Field("5y")
+    rf: float = Field(0.0)
+    compounded: bool = Field(True)
+    periods_per_year: int = Field(252)
+    rolling_window: int = Field(126, ge=2)
+
+
+class CompareRequest(BaseModel):
+    """Compare several custom strategies on a shared date axis."""
+
+    dates: list[str] = Field(..., description="Shared date axis (ISO 8601).")
+    strategies: dict[str, list[float]] = Field(
+        ..., description="Strategy name -> per-date returns (2+ strategies)."
+    )
+    rf: float = Field(0.0)
+    compounded: bool = Field(True)
+    periods_per_year: int = Field(252)
+    rolling_window: int = Field(126, ge=2)
+
+
 # ---------------------------------------------------------------------------
 # Response
 # ---------------------------------------------------------------------------
@@ -141,6 +166,12 @@ class AnalysisResponse(BaseModel):
     # chart -> column -> points. Dynamic column keys => Record<string, ...> in TS.
     series: dict[str, dict[str, list[SeriesPoint]]]
     tables: Tables
+
+
+class ComparisonResponse(BaseModel):
+    meta: Meta
+    metrics: MetricsTable
+    series: dict[str, dict[str, list[SeriesPoint]]]
 
 
 class HealthResponse(BaseModel):

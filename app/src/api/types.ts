@@ -105,6 +105,22 @@ export interface SymbolRequest {
   rolling_window?: number;
 }
 
+export interface CompareSymbolsRequest {
+  symbols: string[];
+  provider?: string;
+  period?: string;
+  rf?: number;
+  compounded?: boolean;
+  periods_per_year?: number;
+  rolling_window?: number;
+}
+
+export interface ComparisonResponse {
+  meta: Meta;
+  metrics: MetricsTable;
+  series: SeriesBundle;
+}
+
 export interface HealthResponse {
   status: string;
   version: string;

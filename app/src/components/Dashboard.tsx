@@ -147,8 +147,8 @@ function InputBar({
               onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }} />
           </label>
           <span className="text-xs text-muted">
-            Columns: <span className="nums text-ink">date, return[, benchmark]</span> — decimals, %, or
-            prices. Header optional.
+            Columns: <span className="nums text-ink">date, return[, benchmark]</span> (decimals, %,
+            or prices). Header optional.
           </span>
           {csvInfo && <span className="text-xs text-pnl-pos nums">Loaded {csvInfo}</span>}
           {csvError && <span className="text-xs text-pnl-neg">{csvError}</span>}
@@ -418,7 +418,14 @@ function StatusFooter({ health }: { health?: { version: string } }) {
       <span className="serif text-sm text-muted">OpenStatz</span>
       <span className="nums">{health?.version ?? ""}</span>
       <span>· kernels: numpy</span>
-      <span className="ml-auto">Parity-enforced rebuild of QuantStats</span>
+      <a
+        href="https://openalgo.in"
+        target="_blank"
+        rel="noreferrer"
+        className="ml-auto hover:text-ink transition-colors"
+      >
+        openalgo.in
+      </a>
     </div>
   );
 }

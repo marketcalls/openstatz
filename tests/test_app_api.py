@@ -148,3 +148,42 @@ def test_analyze_symbol_empty_is_404(client, monkeypatch):
     monkeypatch.setattr(providers, "download_returns", _empty)
     r = client.post("/api/analyze/symbol", json={"symbol": "BADTICKER"})
     assert r.status_code == 404
+
+
+def test_compare_symbols(client, monkeypatch):
+    from openstatz import providers
+
+    idx = pd.bdate_range("2021-01-01", periods=400)
+    rng = np.random.default_rng(5)
+
+    def _fake(symbol, provider="yfinance", period="5y"):
+        return pd.Series(rng.normal(0.0006, 0.012, 400), index=idx, name=symbol)
+
+    monkeypatch.setattr(providers, "download_returns", _fake)
+    r = client.post("/api/compare/symbols", json={"symbols": ["AAPL", "NVDA", "MSFT"], "period": "5y"})
+    assert r.status_code == 200, r.text
+    j = r.json()
+    assert j["meta"]["columns"] == ["AAPL", "NVDA", "MSFT"]
+    assert set(j["series"]["cumulative"].keys()) == {"AAPL", "NVDA", "MSFT"}
+    assert "AAPL" in j["metrics"]["columns"] and "NVDA" in j["metrics"]["columns"]
+
+
+def test_compare_needs_two_symbols(client):
+    r = client.post("/api/compare/symbols", json={"symbols": ["AAPL"]})
+    assert r.status_code == 422
+
+
+def test_compare_custom_strategies(client):
+    idx = pd.bdate_range("2021-01-01", periods=300)
+    rng = np.random.default_rng(9)
+    dates = [d.strftime("%Y-%m-%d") for d in idx]
+    body = {
+        "dates": dates,
+        "strategies": {
+            "Alpha": list(rng.normal(0.0007, 0.011, 300)),
+            "Beta": list(rng.normal(0.0003, 0.008, 300)),
+        },
+    }
+    r = client.post("/api/compare", json=body)
+    assert r.status_code == 200, r.text
+    assert r.json()["meta"]["columns"] == ["Alpha", "Beta"]

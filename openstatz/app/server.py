@@ -16,6 +16,9 @@ from openstatz.app import serializers
 from openstatz.app.schemas import (
     AnalysisResponse,
     AnalyzeRequest,
+    CompareRequest,
+    CompareSymbolsRequest,
+    ComparisonResponse,
     HealthResponse,
     SymbolRequest,
 )
@@ -129,6 +132,54 @@ def create_app():
             rolling_window=req.rolling_window,
         )
         return AnalysisResponse.model_validate(bundle)
+
+    @app.post("/api/compare/symbols", response_model=ComparisonResponse)
+    def compare_symbols(req: CompareSymbolsRequest) -> ComparisonResponse:
+        from openstatz import providers
+
+        series = {}
+        for sym in req.symbols:
+            try:
+                s = providers.download_returns(sym, provider=req.provider, period=req.period)
+            except Exception as exc:  # noqa: BLE001
+                raise HTTPException(status_code=502, detail=f"fetch failed for {sym!r}: {exc}") from exc
+            if s is None or len(s) == 0 or float(s.abs().sum()) == 0.0:
+                raise HTTPException(status_code=404, detail=f"no data for symbol {sym!r}")
+            series[sym] = s.rename(sym)
+
+        df = pd.concat(series.values(), axis=1, join="inner").dropna()
+        if df.shape[0] < 2 or df.shape[1] < 2:
+            raise HTTPException(status_code=422, detail="need 2+ symbols with overlapping data")
+
+        bundle = serializers.serialize_comparison(
+            df,
+            rf=req.rf,
+            compounded=req.compounded,
+            periods_per_year=req.periods_per_year,
+            rolling_window=req.rolling_window,
+        )
+        return ComparisonResponse.model_validate(bundle)
+
+    @app.post("/api/compare", response_model=ComparisonResponse)
+    def compare(req: CompareRequest) -> ComparisonResponse:
+        names = list(req.strategies.keys())
+        if len(names) < 2:
+            raise HTTPException(status_code=422, detail="need at least 2 strategies")
+        idx = pd.to_datetime(pd.Index(req.dates))
+        for name, vals in req.strategies.items():
+            if len(vals) != len(idx):
+                raise HTTPException(
+                    status_code=422, detail=f"strategy '{name}' length != dates length"
+                )
+        df = pd.DataFrame({n: req.strategies[n] for n in names}, index=idx)
+        bundle = serializers.serialize_comparison(
+            df,
+            rf=req.rf,
+            compounded=req.compounded,
+            periods_per_year=req.periods_per_year,
+            rolling_window=req.rolling_window,
+        )
+        return ComparisonResponse.model_validate(bundle)
 
     _mount_ui(app)
     return app

@@ -1,6 +1,8 @@
 import type {
   AnalysisResponse,
   AnalyzeRequest,
+  CompareSymbolsRequest,
+  ComparisonResponse,
   HealthResponse,
   SymbolRequest,
 } from "./types";
@@ -26,6 +28,10 @@ export function analyze(req: AnalyzeRequest): Promise<AnalysisResponse> {
 
 export function analyzeSymbol(req: SymbolRequest): Promise<AnalysisResponse> {
   return post<AnalysisResponse>("/api/analyze/symbol", req);
+}
+
+export function compareSymbols(req: CompareSymbolsRequest): Promise<ComparisonResponse> {
+  return post<ComparisonResponse>("/api/compare/symbols", req);
 }
 
 export async function health(): Promise<HealthResponse> {

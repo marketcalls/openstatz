@@ -184,7 +184,7 @@ def html(
     output=None,
     compounded=True,
     periods_per_year=252,
-    download_filename="quantstats-tearsheet.html",
+    download_filename="openstatz-tearsheet.html",
     figfmt="svg",
     template_path=None,
     match_dates=True,
@@ -217,7 +217,7 @@ def html(
         Whether to compound returns for calculations
     periods_per_year : int, default 252
         Number of trading periods per year for annualization
-    download_filename : str, default "quantstats-tearsheet.html"
+    download_filename : str, default "openstatz-tearsheet.html"
         Filename for browser download if output is None
     figfmt : str, default "svg"
         Format for embedded charts ('svg', 'png', 'jpg')
@@ -2374,7 +2374,7 @@ def _html_table(obj, showindex="default"):
     return obj
 
 
-def _download_html(html, filename="quantstats-tearsheet.html"):
+def _download_html(html, filename="openstatz-tearsheet.html"):
     """
     Generate JavaScript code to download HTML content in browser.
 
@@ -2386,7 +2386,7 @@ def _download_html(html, filename="quantstats-tearsheet.html"):
     ----------
     html : str
         HTML content to be downloaded
-    filename : str, default "quantstats-tearsheet.html"
+    filename : str, default "openstatz-tearsheet.html"
         Filename for the downloaded file
 
     Returns

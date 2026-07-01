@@ -1,4 +1,7 @@
-import type { AnalysisResponse, MetricRow } from "../api/types";
+import type { MetricRow, MetricsTable } from "../api/types";
+
+// Anything carrying a metrics table (AnalysisResponse or ComparisonResponse).
+type HasMetrics = { metrics: MetricsTable };
 
 // reports.metrics uses some non-ASCII labels (e.g. "CAGR﹪" with U+FE6A, "R^2").
 // Normalize away percent signs / case / spacing so lookups by a clean name still
@@ -9,7 +12,7 @@ export function normLabel(s: string): string {
   return s.replace(STRIP, "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
-export function findRow(data: AnalysisResponse, query: string): MetricRow | undefined {
+export function findRow(data: HasMetrics, query: string): MetricRow | undefined {
   const n = normLabel(query);
   return data.metrics.rows.find((r) => normLabel(r.label) === n);
 }
@@ -21,7 +24,7 @@ export interface MetricView {
 }
 
 export function getMetric(
-  data: AnalysisResponse,
+  data: HasMetrics,
   query: string,
   col: string,
   benchCol: string | null,
@@ -61,6 +64,30 @@ const N = (name: string, metric: string, desc?: string): StatSpec => ({
   fmt: "num",
   desc,
 });
+
+// Key metrics for head-to-head comparison, with the direction that is "better".
+// For Max Drawdown the value is negative, so higher (closer to zero) is better.
+export interface CompareSpec {
+  name: string;
+  metric: string;
+  fmt: Fmt;
+  better: "up" | "down";
+}
+
+export const COMPARE_METRICS: CompareSpec[] = [
+  { name: "Cumulative Return", metric: "Cumulative Return", fmt: "pct", better: "up" },
+  { name: "CAGR", metric: "CAGR", fmt: "pct", better: "up" },
+  { name: "Sharpe", metric: "Sharpe", fmt: "num", better: "up" },
+  { name: "Sortino", metric: "Sortino", fmt: "num", better: "up" },
+  { name: "Calmar", metric: "Calmar", fmt: "num", better: "up" },
+  { name: "Max Drawdown", metric: "Max Drawdown", fmt: "pct", better: "up" },
+  { name: "Volatility (ann.)", metric: "Volatility (ann.)", fmt: "pct", better: "down" },
+  { name: "Omega", metric: "Omega", fmt: "num", better: "up" },
+  { name: "Win Days", metric: "Win Days", fmt: "pct", better: "up" },
+  { name: "Profit Factor", metric: "Profit Factor", fmt: "num", better: "up" },
+  { name: "Ulcer Index", metric: "Ulcer Index", fmt: "num", better: "down" },
+  { name: "Recovery Factor", metric: "Recovery Factor", fmt: "num", better: "up" },
+];
 
 export const GROUPS: Record<string, StatSpec[]> = {
   overview: [

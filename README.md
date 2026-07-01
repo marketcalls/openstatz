@@ -13,6 +13,7 @@ in a browser.
   `pip install openstatz`, with no server and no Node.js.
 - Or run the same dashboard as a live server (`openstatz serve`) to type tickers and upload CSVs.
 - Send your backtest returns (a CSV file or a pandas Series) and get a full report.
+- Compare several strategies side by side and see which one is better on each metric.
 
 ## Install
 
@@ -66,6 +67,65 @@ os.reports.html(returns, benchmark=benchmark, output="tearsheet.html")
 os.reports.metrics(returns, mode="full", display=True)
 ```
 
+## Examples for traders
+
+**US market (a stock vs the market).**
+
+```python
+import openstatz as os
+
+aapl = os.utils.download_returns("AAPL")     # or NVDA, MSFT, TSLA, ...
+spy  = os.utils.download_returns("SPY")
+
+os.dashboard(aapl, benchmark=spy, output="aapl.html")      # modern tearsheet
+os.reports.html(aapl, benchmark=spy, output="aapl_classic.html")   # classic tearsheet
+```
+
+**Indian market (a stock vs the Nifty 50).**
+
+```python
+import openstatz as os
+
+reliance = os.utils.download_returns("RELIANCE.NS")   # NSE tickers end in .NS
+nifty    = os.utils.download_returns("^NSEI")          # Nifty 50 index
+
+os.dashboard(reliance, benchmark=nifty, output="reliance.html")
+```
+
+**Your own backtest strategy.** Feed a pandas Series of daily returns straight from your backtest.
+
+```python
+import openstatz as os
+
+returns = my_backtest.returns          # pd.Series of daily returns
+bench   = os.utils.download_returns("SPY")
+
+os.dashboard(returns, benchmark=bench, output="strategy.html")
+os.reports.metrics(returns, benchmark=bench, mode="full", display=True)
+```
+
+CSV works too: a `date, return` file (with an optional third benchmark column). Load it with
+pandas and pass the Series, or drop it into the web app (see below).
+
+## Compare strategies
+
+See which of several strategies is better, at a glance. Start the server and open the **Compare**
+tab, or call the API. Best value per metric is green, worst is red, and the leader wins the most
+key metrics.
+
+![OpenStatz compare view](https://raw.githubusercontent.com/marketcalls/openstatz/main/docs/images/compare.png)
+
+```bash
+openstatz serve      # then click "Compare" and enter, e.g., AAPL, NVDA
+```
+
+```bash
+# Or the API, for tickers or your own strategies:
+curl -X POST http://127.0.0.1:8000/api/compare/symbols \
+  -H "Content-Type: application/json" \
+  -d '{"symbols": ["AAPL", "NVDA", "MSFT"], "period": "5y"}'
+```
+
 ## Open the web tearsheet (live server)
 
 ```bash
@@ -104,6 +164,7 @@ Endpoints:
 - `GET /api/health`
 - `POST /api/analyze` for your own returns
 - `POST /api/analyze/symbol` for a ticker the server fetches for you
+- `POST /api/compare/symbols` and `POST /api/compare` to compare several strategies
 
 ## The same numbers as QuantStats
 
