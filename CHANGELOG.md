@@ -8,6 +8,7 @@ All notable changes to OpenStatz are documented here. This project adheres to
 ### Changed
 - Compare: the head-to-head table uses "Serenity Index" instead of "Recovery Factor", which is
   blank for multi-strategy input.
+- Pin `pandas<3` for now: the vendored QuantStats compute core is not yet pandas-3.0 ready.
 
 ### Added
 - Tag-triggered PyPI release workflow using Trusted Publishing (no stored token); see RELEASING.md.

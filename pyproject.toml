@@ -46,7 +46,9 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-    "pandas>=1.5.0",
+    # Upper-bounded at <3 for now: the vendored QuantStats compute core is not
+    # yet pandas-3.0 ready (its reports.metrics path errors on pandas 3.x).
+    "pandas>=1.5.0,<3",
     "numpy>=1.24.0",
     "scipy>=1.11.0",
     "matplotlib>=3.7.0",
