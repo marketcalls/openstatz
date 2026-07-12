@@ -3305,3 +3305,157 @@ def montecarlo_cagr(returns, sims=1000, seed=None):
         "percentile_5": cagr_series.quantile(0.05),
         "percentile_95": cagr_series.quantile(0.95),
     }
+
+
+# ---------------------------------------------------------------------------
+# Tearsheet analytics — rolling hit-rate, streak distribution, per-horizon
+# return/risk. These are additive helpers (not part of the QuantStats parity
+# surface); they reuse the parity-locked cagr()/max_drawdown() primitives.
+# ---------------------------------------------------------------------------
+
+def rolling_win_rate(
+    returns: Returns,
+    rolling_period: int = 126,
+    prepare_returns: bool = True,
+) -> _pd.Series:
+    """Rolling win rate over a trailing window.
+
+    The win rate here is *period-based* — the share of **positive** periods
+    among the **non-zero** periods in the window — matching the convention of
+    :func:`win_rate` (it is NOT a trade-level hit rate). Windows are right-
+    aligned; the first ``rolling_period - 1`` points are NaN.
+
+    Args:
+        returns (pd.Series): Return series to analyze.
+        rolling_period (int): Trailing window length (default: 126, ~6 months).
+        prepare_returns (bool): Whether to prepare returns first (default: True).
+
+    Returns:
+        pd.Series: Rolling win rate as a decimal in [0, 1] (NaN where the
+        window has no non-zero periods).
+
+    Example:
+        >>> wr = rolling_win_rate(returns, rolling_period=252)
+        >>> wr.tail()
+    """
+    if prepare_returns:
+        returns = _utils._prepare_returns(returns)
+
+    wins = (returns > 0).astype(float)
+    nonzero = (returns != 0).astype(float)
+    won = wins.rolling(rolling_period).sum()
+    traded = nonzero.rolling(rolling_period).sum()
+    # Avoid 0/0: windows with no non-zero periods are undefined (NaN).
+    out = won / traded.where(traded > 0)
+    # Preserve the input series' name so downstream per-column keying (the web
+    # dashboard looks charts up by column name) matches the other rolling series.
+    out.name = getattr(returns, "name", None)
+    return out
+
+
+def consecutive_loss_lengths(
+    returns: Returns,
+    prepare_returns: bool = True,
+) -> _pd.Series:
+    """Length of every maximal run of consecutive losing periods.
+
+    Where :func:`consecutive_losses` returns only the single worst streak, this
+    returns the full set of streak lengths, so the caller can build a
+    distribution (how often a 1-day loss, a 2-day loss, ... occurred). Losses
+    are periods with a strictly negative return; zero/positive periods break a
+    streak. Period-based, not trade-level.
+
+    Args:
+        returns (pd.Series): Return series to analyze.
+        prepare_returns (bool): Whether to prepare returns first (default: True).
+
+    Returns:
+        pd.Series: One integer per losing streak (empty if there are no losses).
+
+    Example:
+        >>> lengths = consecutive_loss_lengths(returns)
+        >>> lengths.value_counts().sort_index()   # streak-length histogram
+    """
+    if prepare_returns:
+        returns = _utils._prepare_returns(returns)
+
+    losing = returns < 0
+    if not bool(losing.any()):
+        return _pd.Series([], dtype="int64", name="consecutive_loss_lengths")
+
+    # Label each maximal run of equal booleans, then keep the losing runs and
+    # count their members.
+    run_id = (losing != losing.shift()).cumsum()
+    run_len = losing.groupby(run_id).sum()
+    lengths = run_len[run_len > 0].astype("int64")
+    return _pd.Series(lengths.to_numpy(), name="consecutive_loss_lengths")
+
+
+def horizon_summary(
+    returns: Returns,
+    rf: float = 0.0,
+    compounded: bool = True,
+    periods: int = 252,
+    horizons: tuple[tuple[str, int | None], ...] = (
+        ("1Y", 1),
+        ("3Y", 3),
+        ("5Y", 5),
+        ("All", None),
+    ),
+    prepare_returns: bool = True,
+) -> dict[str, dict[str, float]]:
+    """CAGR, Max Drawdown and Calmar for trailing calendar-year windows.
+
+    For each horizon the returns are sliced to the trailing ``n`` calendar years
+    (``None`` means the whole series) and the three figures are computed on that
+    slice using the parity-locked :func:`cagr` / :func:`max_drawdown`. A window
+    longer than the available history yields NaN for that horizon (so a strategy
+    with two years of data reports NaN for 3Y/5Y rather than mislabelling two
+    years as five). ``All`` is always populated.
+
+    Args:
+        returns (pd.Series): Return series to analyze (must have a DatetimeIndex).
+        rf (float): Risk-free rate passed to :func:`cagr` (default: 0.0).
+        compounded (bool): Compound returns (default: True).
+        periods (int): Periods per year for annualization (default: 252).
+        horizons: Ordered ``(label, years)`` pairs; ``years=None`` = all-time.
+        prepare_returns (bool): Whether to prepare returns first (default: True).
+
+    Returns:
+        dict[str, dict]: ``{label: {"cagr", "max_drawdown", "calmar"}}`` with
+        NaN where a horizon exceeds the available history.
+
+    Example:
+        >>> horizon_summary(returns)["3Y"]
+        {'cagr': 0.14, 'max_drawdown': -0.21, 'calmar': 0.67}
+    """
+    if prepare_returns:
+        returns = _utils._prepare_returns(returns)
+
+    nan_row = {"cagr": float("nan"), "max_drawdown": float("nan"), "calmar": float("nan")}
+    if len(returns) == 0:
+        return {label: dict(nan_row) for label, _ in horizons}
+
+    start = returns.index[0]
+    end = returns.index[-1]
+    out: dict[str, dict[str, float]] = {}
+    for label, years in horizons:
+        if years is None:
+            window = returns
+        else:
+            cutoff = end - _pd.DateOffset(years=years)
+            if start > cutoff:  # not enough history to cover this horizon
+                out[label] = dict(nan_row)
+                continue
+            window = returns[returns.index >= cutoff]
+
+        if len(window) == 0:
+            out[label] = dict(nan_row)
+            continue
+
+        c = float(cagr(window, rf=rf, compounded=compounded, periods=periods))
+        mdd = float(max_drawdown(window))
+        calmar_v = c / abs(mdd) if (mdd != 0 and not _np.isnan(mdd)) else float("nan")
+        out[label] = {"cagr": c, "max_drawdown": mdd, "calmar": calmar_v}
+
+    return out

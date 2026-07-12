@@ -187,3 +187,79 @@ def test_compare_custom_strategies(client):
     r = client.post("/api/compare", json=body)
     assert r.status_code == 200, r.text
     assert r.json()["meta"]["columns"] == ["Alpha", "Beta"]
+
+
+# --- Robustness / security regression tests -------------------------------
+
+def test_analyze_empty_input_is_422(client):
+    """Empty dates/returns must be a clean 422, not a 500 (IndexError)."""
+    r = client.post("/api/analyze", json={"dates": [], "returns": {"S": []}})
+    assert r.status_code == 422, r.text
+
+
+def test_compare_invalid_dates_is_422(client):
+    """Unparseable dates must be a clean 422, not a 500 (DateParseError)."""
+    body = {
+        "dates": ["not-a-date", "also-bad"],
+        "strategies": {"A": [0.1, 0.2], "B": [0.1, 0.2]},
+    }
+    r = client.post("/api/compare", json=body)
+    assert r.status_code == 422, r.text
+
+
+def test_spa_path_traversal_is_contained(tmp_path, monkeypatch):
+    """The SPA catch-all must never serve files outside the static root, even
+    when the request smuggles URL-encoded `..` segments (`%2e%2e`)."""
+    import openstatz.app.server as server
+
+    static = tmp_path / "static"
+    (static / "assets").mkdir(parents=True)
+    (static / "index.html").write_text("<html>spa</html>")
+    secret = tmp_path / "secret.txt"
+    secret.write_text("TOP-SECRET")
+
+    monkeypatch.setattr(server, "_static_dir", lambda: static)
+    c = TestClient(server.create_app())
+
+    r = c.get("/%2e%2e/secret.txt")
+    assert "TOP-SECRET" not in r.text  # must not leak the sibling file
+    # Falls back to the SPA shell so client-side routing still works.
+    assert "spa" in r.text
+
+
+def test_cors_rejects_arbitrary_origin(client):
+    """A wildcard CORS policy would let any site read a user's local server;
+    an untrusted Origin must not be reflected back."""
+    r = client.get("/api/health", headers={"Origin": "http://evil.example"})
+    assert r.headers.get("access-control-allow-origin") != "http://evil.example"
+
+
+def test_cors_allows_env_override(monkeypatch):
+    """OPENSTATZ_CORS_ORIGINS lets an operator opt a trusted origin back in."""
+    monkeypatch.setenv("OPENSTATZ_CORS_ORIGINS", "http://my-ui.example")
+    c = TestClient(create_app())
+    r = c.get("/api/health", headers={"Origin": "http://my-ui.example"})
+    assert r.headers.get("access-control-allow-origin") == "http://my-ui.example"
+
+
+# --- Tearsheet analytics: rolling win rate, horizon, loss streaks ---------
+
+def test_analyze_includes_tearsheet_analytics(client):
+    r = client.post("/api/analyze", json=_payload())
+    assert r.status_code == 200, r.text
+    j = r.json()
+    col = j["meta"]["columns"][0]
+
+    # Rolling win rate is keyed by the strategy column name (so the UI finds it).
+    assert "rolling_win_rate" in j["series"]
+    assert col in j["series"]["rolling_win_rate"]
+
+    # Horizon table: 1Y/3Y/5Y/All rows, CAGR/MaxDD/Calmar each.
+    horizons = {row["horizon"] for row in j["tables"]["horizon_summary"]["rows"]}
+    assert {"1Y", "3Y", "5Y", "All"} <= horizons
+
+    # Consecutive-loss distribution: bins + summary stats.
+    cl = j["tables"]["consecutive_losses"]
+    assert set(cl) >= {"bins", "max", "avg", "count"}
+    if cl["bins"]:
+        assert all(b["length"] >= 1 and b["count"] >= 1 for b in cl["bins"])

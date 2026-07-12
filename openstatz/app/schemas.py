@@ -22,9 +22,11 @@ class AnalyzeRequest(BaseModel):
     multi-strategy comparison.
     """
 
-    dates: list[str] = Field(..., description="Shared date axis (ISO 8601 strings).")
+    dates: list[str] = Field(
+        ..., min_length=1, description="Shared date axis (ISO 8601 strings)."
+    )
     returns: dict[str, list[float]] = Field(
-        ..., description="Strategy name -> per-date returns (decimal, not %)."
+        ..., min_length=1, description="Strategy name -> per-date returns (decimal, not %)."
     )
     benchmark: list[float] | None = Field(
         None, description="Optional benchmark returns aligned to `dates`."
@@ -66,9 +68,9 @@ class CompareSymbolsRequest(BaseModel):
 class CompareRequest(BaseModel):
     """Compare several custom strategies on a shared date axis."""
 
-    dates: list[str] = Field(..., description="Shared date axis (ISO 8601).")
+    dates: list[str] = Field(..., min_length=1, description="Shared date axis (ISO 8601).")
     strategies: dict[str, list[float]] = Field(
-        ..., description="Strategy name -> per-date returns (2+ strategies)."
+        ..., min_length=2, description="Strategy name -> per-date returns (2+ strategies)."
     )
     rf: float = Field(0.0)
     compounded: bool = Field(True)
@@ -153,11 +155,36 @@ class WeeklyHeatmap(BaseModel):
     by_year: dict[str, list[WeeklyCell]]
 
 
+class HorizonRow(BaseModel):
+    horizon: str
+    cagr: float | None = None
+    max_drawdown: float | None = None
+    calmar: float | None = None
+
+
+class HorizonSummary(BaseModel):
+    rows: list[HorizonRow]
+
+
+class ConsecutiveLossBin(BaseModel):
+    length: int
+    count: int
+
+
+class ConsecutiveLosses(BaseModel):
+    bins: list[ConsecutiveLossBin]
+    max: int
+    avg: float | None = None
+    count: int
+
+
 class Tables(BaseModel):
     monthly_heatmap: MonthlyHeatmap
     weekly_heatmap: WeeklyHeatmap
     eoy: EoyTable
     worst_drawdowns: DrawdownTable
+    horizon_summary: HorizonSummary
+    consecutive_losses: ConsecutiveLosses
 
 
 class AnalysisResponse(BaseModel):

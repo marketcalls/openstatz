@@ -17,6 +17,11 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="openstatz",
         description="OpenStatz - portfolio analytics for quants.",
     )
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Print the OpenStatz version and exit.",
+    )
     sub = parser.add_subparsers(dest="command")
 
     serve = sub.add_parser("serve", help="Run the OpenStatz web API server (needs [app] extra).")
@@ -32,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    if args.command == "version" or args.command is None and "--version" in (argv or sys.argv[1:]):
+    if args.version or args.command == "version":
         from openstatz import __version__
 
         print(f"openstatz {__version__}")

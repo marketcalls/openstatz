@@ -207,6 +207,11 @@ def serialize_series(
     out["rolling_sortino"] = _per_col_points(
         _safe(lambda: stats.rolling_sortino(ctx.returns, rolling_period=rolling_window))
     )
+    # Rolling hit rate (% of positive periods among non-zero periods in the
+    # window). Period-based, not trade-level — see stats.rolling_win_rate.
+    out["rolling_win_rate"] = _per_col_points(
+        _safe(lambda: stats.rolling_win_rate(ctx.returns, rolling_period=rolling_window))
+    )
 
     # Benchmark-relative rolling beta + the benchmark's own equity/drawdown so
     # the UI can overlay it on the cumulative-return chart.
@@ -347,6 +352,64 @@ def serialize_worst_drawdowns(returns: pd.Series, *, top: int = 10) -> dict[str,
     return {"rows": rows}
 
 
+def serialize_horizon_summary(
+    returns: pd.Series,
+    *,
+    rf: float = 0.0,
+    compounded: bool = True,
+    periods_per_year: int = 252,
+) -> dict[str, Any]:
+    """Per-horizon CAGR / Max Drawdown / Calmar (1Y, 3Y, 5Y, all-time).
+
+    One row per horizon; horizons longer than the available history carry
+    ``null`` values (the UI renders them as "N/A").
+    """
+    from openstatz import stats
+
+    if isinstance(returns, pd.DataFrame):
+        returns = returns[returns.columns[0]]
+
+    summary = stats.horizon_summary(
+        returns, rf=rf, compounded=compounded, periods=periods_per_year
+    )
+    rows = [
+        {
+            "horizon": label,
+            "cagr": _f(vals.get("cagr")),
+            "max_drawdown": _f(vals.get("max_drawdown")),
+            "calmar": _f(vals.get("calmar")),
+        }
+        for label, vals in summary.items()
+    ]
+    return {"rows": rows}
+
+
+def serialize_consecutive_losses(returns: pd.Series) -> dict[str, Any]:
+    """Distribution of consecutive-losing-period streak lengths.
+
+    Returns a histogram (streak length -> how many times it occurred) plus the
+    worst and average streak, so the UI can plot the shape of losing runs
+    instead of only the single-number maximum.
+    """
+    from openstatz import stats
+
+    if isinstance(returns, pd.DataFrame):
+        returns = returns[returns.columns[0]]
+
+    lengths = stats.consecutive_loss_lengths(returns)
+    if lengths is None or len(lengths) == 0:
+        return {"bins": [], "max": 0, "avg": None, "count": 0}
+
+    counts = lengths.value_counts().sort_index()
+    bins = [{"length": int(k), "count": int(v)} for k, v in counts.items()]
+    return {
+        "bins": bins,
+        "max": int(lengths.max()),
+        "avg": _f(float(lengths.mean())),
+        "count": int(len(lengths)),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Full bundle
 # ---------------------------------------------------------------------------
@@ -361,6 +424,8 @@ def serialize_analysis(
     rolling_window: int = 126,
 ) -> dict[str, Any]:
     """The complete analysis payload: metrics + series + tables + meta."""
+    if len(returns) == 0:
+        raise ValueError("`returns` is empty — provide at least one observation.")
     primary = returns
     if isinstance(returns, pd.DataFrame) and returns.shape[1] >= 1:
         primary = returns[returns.columns[0]]
@@ -402,6 +467,10 @@ def serialize_analysis(
             "weekly_heatmap": serialize_weekly_heatmap(primary, compounded=compounded),
             "eoy": serialize_eoy(primary, benchmark, compounded=compounded),
             "worst_drawdowns": serialize_worst_drawdowns(primary),
+            "horizon_summary": serialize_horizon_summary(
+                primary, rf=rf, compounded=compounded, periods_per_year=periods_per_year
+            ),
+            "consecutive_losses": serialize_consecutive_losses(primary),
         },
     }
 
@@ -428,6 +497,8 @@ def serialize_comparison(
     from openstatz import stats
     from openstatz._context import ReturnsContext
 
+    if len(returns) == 0:
+        raise ValueError("`returns` is empty — provide at least one observation.")
     if isinstance(returns, pd.Series):
         returns = returns.to_frame()
     # Make the column names distinct strings.

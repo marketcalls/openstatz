@@ -1,5 +1,46 @@
-import type { EoyRow, DrawdownRow } from "../../api/types";
+import type { EoyRow, DrawdownRow, HorizonRow } from "../../api/types";
 import { fmtPct, fmtNumber, pnlClass } from "../../lib/format";
+
+// Return & Risk by horizon: CAGR / Max Drawdown / Calmar over trailing 1Y, 3Y,
+// 5Y and all-time windows. Horizons longer than the available history come back
+// as null and render as "N/A" (never a mislabelled short window).
+export function HorizonTable({ rows }: { rows: HorizonRow[] }) {
+  const LABEL: Record<string, string> = {
+    "1Y": "1 Year",
+    "3Y": "3 Years",
+    "5Y": "5 Years",
+    All: "All-time",
+  };
+  const na = (v: number | null) => v === null || Number.isNaN(v);
+  return (
+    <table className="w-full text-sm">
+      <thead>
+        <tr className="border-b border-hair text-muted">
+          <th className="text-left py-2 px-3 font-medium">Horizon</th>
+          <th className="text-right py-2 px-3 font-medium">CAGR</th>
+          <th className="text-right py-2 px-3 font-medium">Max DD</th>
+          <th className="text-right py-2 px-3 font-medium">Calmar</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.horizon} className="border-b border-hair/60">
+            <td className="py-1.5 px-3 text-ink">{LABEL[r.horizon] ?? r.horizon}</td>
+            <td className={`py-1.5 px-3 text-right nums ${na(r.cagr) ? "text-faint" : pnlClass(r.cagr)}`}>
+              {na(r.cagr) ? "N/A" : fmtPct(r.cagr)}
+            </td>
+            <td className={`py-1.5 px-3 text-right nums ${na(r.max_drawdown) ? "text-faint" : "text-pnl-neg"}`}>
+              {na(r.max_drawdown) ? "N/A" : fmtPct(r.max_drawdown)}
+            </td>
+            <td className="py-1.5 px-3 text-right nums text-ink">
+              {na(r.calmar) ? "N/A" : fmtNumber(r.calmar, 2)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 export function EoyTable({ rows, hasBenchmark }: { rows: EoyRow[]; hasBenchmark: boolean }) {
   return (

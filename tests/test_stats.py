@@ -271,3 +271,62 @@ class TestEdgeCases:
         result = stats.sharpe(df)
         assert isinstance(result, pd.Series)
         assert len(result) == 2
+
+
+class TestTearsheetAnalytics:
+    """rolling_win_rate / consecutive_loss_lengths / horizon_summary."""
+
+    def test_rolling_win_rate_range_and_name(self, sample_returns):
+        wr = stats.rolling_win_rate(sample_returns, rolling_period=60)
+        # first (window-1) points are NaN; the rest are valid fractions in [0,1]
+        assert wr.isna().sum() == 59
+        valid = wr.dropna()
+        assert ((valid >= 0) & (valid <= 1)).all()
+        # name must be preserved so per-column keying in the UI matches
+        assert wr.name == sample_returns.name
+
+    def test_rolling_win_rate_matches_expanding_definition(self):
+        # A hand-checkable series: pattern of + - + - ...
+        idx = pd.date_range("2021-01-01", periods=10, freq="D")
+        r = pd.Series([0.1, -0.1, 0.1, -0.1, 0.1, -0.1, 0.1, -0.1, 0.1, -0.1], index=idx)
+        wr = stats.rolling_win_rate(r, rolling_period=4)
+        # every full 4-window has exactly 2 wins of 4 non-zero -> 0.5
+        assert np.allclose(wr.dropna().values, 0.5)
+
+    def test_consecutive_loss_lengths_max_matches_scalar(self, sample_returns):
+        lengths = stats.consecutive_loss_lengths(sample_returns)
+        assert int(lengths.max()) == int(stats.consecutive_losses(sample_returns))
+        # every recorded streak length is a positive integer
+        assert (lengths > 0).all()
+
+    def test_consecutive_loss_lengths_known(self):
+        idx = pd.date_range("2021-01-01", periods=8, freq="D")
+        # streaks of losses: [1], [3], [2]  -> lengths {1,3,2}
+        r = pd.Series([-0.1, 0.1, -0.1, -0.1, -0.1, 0.1, -0.1, -0.1], index=idx)
+        lengths = sorted(stats.consecutive_loss_lengths(r).tolist())
+        assert lengths == [1, 2, 3]
+
+    def test_consecutive_loss_lengths_no_losses(self):
+        idx = pd.date_range("2021-01-01", periods=4, freq="D")
+        r = pd.Series([0.1, 0.2, 0.1, 0.3], index=idx)
+        assert len(stats.consecutive_loss_lengths(r)) == 0
+
+    def test_horizon_summary_alltime_matches_direct(self):
+        idx = pd.date_range("2016-01-01", periods=1600, freq="B")
+        rng = np.random.default_rng(0)
+        r = pd.Series(rng.normal(0.0005, 0.011, len(idx)), index=idx, name="s")
+        hs = stats.horizon_summary(r)
+        assert abs(hs["All"]["cagr"] - float(stats.cagr(r))) < 1e-12
+        assert abs(hs["All"]["max_drawdown"] - float(stats.max_drawdown(r))) < 1e-12
+        # Calmar = CAGR / |MaxDD|
+        exp = hs["All"]["cagr"] / abs(hs["All"]["max_drawdown"])
+        assert abs(hs["All"]["calmar"] - exp) < 1e-12
+
+    def test_horizon_summary_short_history_is_nan(self):
+        idx = pd.date_range("2023-01-01", periods=400, freq="B")  # <2y
+        rng = np.random.default_rng(1)
+        r = pd.Series(rng.normal(0.0005, 0.01, len(idx)), index=idx, name="s")
+        hs = stats.horizon_summary(r)
+        assert np.isnan(hs["3Y"]["cagr"]) and np.isnan(hs["5Y"]["cagr"])
+        assert not np.isnan(hs["1Y"]["cagr"])
+        assert not np.isnan(hs["All"]["cagr"])

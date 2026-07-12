@@ -255,8 +255,11 @@ def safe_random_seed(seed: Optional[int]):
     >>> safe_random_seed(None)  # No seed set, random behavior continues
     """
     if seed is not None:
-        # Use the modern random number generator (numpy 1.17.0+)
-        np.random.default_rng(seed)
+        # Seed the legacy global RNG so subsequent np.random.* calls are
+        # reproducible. (np.random.default_rng(seed) returns a *new* Generator
+        # and leaves the global state untouched, which made this a silent
+        # no-op.)
+        np.random.seed(seed)
 
 
 def safe_datetime64_unit(dt, unit: str):

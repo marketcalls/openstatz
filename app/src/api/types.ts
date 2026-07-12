@@ -58,11 +58,32 @@ export interface WeeklyHeatmap {
   by_year: Record<string, WeeklyCell[]>;
 }
 
+export interface HorizonRow {
+  horizon: string;
+  cagr: number | null;
+  max_drawdown: number | null;
+  calmar: number | null;
+}
+
+export interface ConsecutiveLossBin {
+  length: number;
+  count: number;
+}
+
+export interface ConsecutiveLosses {
+  bins: ConsecutiveLossBin[];
+  max: number;
+  avg: number | null;
+  count: number;
+}
+
 export interface Tables {
   monthly_heatmap: MonthlyHeatmap;
   weekly_heatmap: WeeklyHeatmap;
   eoy: { rows: EoyRow[] };
   worst_drawdowns: { rows: DrawdownRow[] };
+  horizon_summary: { rows: HorizonRow[] };
+  consecutive_losses: ConsecutiveLosses;
 }
 
 export interface Meta {
