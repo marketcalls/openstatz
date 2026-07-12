@@ -15,8 +15,9 @@ import { WeeklyHeatmap } from "./charts/WeeklyHeatmap";
 import { Distribution } from "./charts/Distribution";
 import { BoxPlot } from "./charts/BoxPlot";
 import { EoyBars } from "./charts/EoyBars";
+import { ConsecutiveLossHist } from "./charts/ConsecutiveLossHist";
 import { MetricsTable } from "./table/MetricsTable";
-import { EoyTable, WorstDrawdownsTable } from "./table/DataTables";
+import { EoyTable, WorstDrawdownsTable, HorizonTable } from "./table/DataTables";
 import { GROUPS } from "../lib/metrics";
 
 const PERIODS = ["1y", "2y", "5y", "10y", "max"];
@@ -281,11 +282,11 @@ export function Dashboard() {
             theme={theme}
           />
         </Card>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
           <Card title="Rolling Sharpe" subtitle="126-period window">
             <TimeSeriesChart
               series={seriesFor(data.series.rolling_sharpe, [primary], [accentLine])}
-              height={220}
+              height={200}
               valueFormat="number"
               baseline
               theme={theme}
@@ -294,12 +295,29 @@ export function Dashboard() {
           <Card title="Rolling Volatility" subtitle="Annualized, 126-period">
             <TimeSeriesChart
               series={seriesFor(data.series.rolling_volatility, [primary], [accentLine])}
-              height={220}
+              height={200}
+              valueFormat="percent"
+              theme={theme}
+            />
+          </Card>
+          <Card title="Rolling Win Rate" subtitle="% positive periods, 126-period">
+            <TimeSeriesChart
+              series={seriesFor(data.series.rolling_win_rate, [primary], [accentLine])}
+              height={200}
               valueFormat="percent"
               theme={theme}
             />
           </Card>
         </div>
+        {data.tables.horizon_summary?.rows?.length > 0 && (
+          <Card
+            title="Return & Risk by Horizon"
+            subtitle="CAGR, max drawdown & Calmar over trailing windows"
+            className="mt-4"
+          >
+            <HorizonTable rows={data.tables.horizon_summary.rows} />
+          </Card>
+        )}
         <div className="mt-6">
           <GridLabel>Period Returns</GridLabel>
           <StatGrid data={data} specs={GROUPS.periods} primary={primary} benchCol={benchCol} />
@@ -343,6 +361,15 @@ export function Dashboard() {
         <Card title="Worst Drawdowns" subtitle="Deepest peak-to-recovery episodes" className="mt-6">
           <WorstDrawdownsTable rows={data.tables.worst_drawdowns.rows} />
         </Card>
+        {data.tables.consecutive_losses?.bins?.length > 0 && (
+          <Card
+            title="Consecutive Losing Streaks"
+            subtitle="How often losing runs of each length occurred"
+            className="mt-6"
+          >
+            <ConsecutiveLossHist data={data.tables.consecutive_losses} />
+          </Card>
+        )}
       </section>
 
       {/* 04 Monthly */}

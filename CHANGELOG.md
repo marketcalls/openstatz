@@ -3,6 +3,24 @@
 All notable changes to OpenStatz are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.0]
+
+### Added
+- **Tearsheet analytics**: Rolling Win Rate chart (trailing % of positive periods), a
+  **Return & Risk by Horizon** table (CAGR / Max Drawdown / Calmar over trailing 1Y, 3Y, 5Y and
+  all-time windows, with N/A for horizons longer than the available history), and a
+  **Consecutive Losing Streaks** distribution in the Risk section. New library helpers
+  `stats.rolling_win_rate`, `stats.consecutive_loss_lengths`, and `stats.horizon_summary`.
+
+### Fixed
+- **Web server security**: the `openstatz serve` SPA route no longer follows URL-encoded `..`
+  segments, closing a path-traversal that could read files outside the static root; CORS is now
+  restricted to same-machine origins by default (override with `OPENSTATZ_CORS_ORIGINS`).
+- **Robustness**: `/api/analyze` and `/api/compare` return a clean 422 (instead of a 500) for empty
+  input and unparseable dates.
+- `openstatz --version` now prints the version (the flag was never registered).
+- `safe_random_seed()` now actually seeds the RNG (it previously discarded the generator).
+
 ## [0.3.1]
 
 ### Changed

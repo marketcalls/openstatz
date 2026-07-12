@@ -240,3 +240,26 @@ def test_cors_allows_env_override(monkeypatch):
     c = TestClient(create_app())
     r = c.get("/api/health", headers={"Origin": "http://my-ui.example"})
     assert r.headers.get("access-control-allow-origin") == "http://my-ui.example"
+
+
+# --- Tearsheet analytics: rolling win rate, horizon, loss streaks ---------
+
+def test_analyze_includes_tearsheet_analytics(client):
+    r = client.post("/api/analyze", json=_payload())
+    assert r.status_code == 200, r.text
+    j = r.json()
+    col = j["meta"]["columns"][0]
+
+    # Rolling win rate is keyed by the strategy column name (so the UI finds it).
+    assert "rolling_win_rate" in j["series"]
+    assert col in j["series"]["rolling_win_rate"]
+
+    # Horizon table: 1Y/3Y/5Y/All rows, CAGR/MaxDD/Calmar each.
+    horizons = {row["horizon"] for row in j["tables"]["horizon_summary"]["rows"]}
+    assert {"1Y", "3Y", "5Y", "All"} <= horizons
+
+    # Consecutive-loss distribution: bins + summary stats.
+    cl = j["tables"]["consecutive_losses"]
+    assert set(cl) >= {"bins", "max", "avg", "count"}
+    if cl["bins"]:
+        assert all(b["length"] >= 1 and b["count"] >= 1 for b in cl["bins"])

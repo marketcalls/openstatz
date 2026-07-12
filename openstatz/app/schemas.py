@@ -155,11 +155,36 @@ class WeeklyHeatmap(BaseModel):
     by_year: dict[str, list[WeeklyCell]]
 
 
+class HorizonRow(BaseModel):
+    horizon: str
+    cagr: float | None = None
+    max_drawdown: float | None = None
+    calmar: float | None = None
+
+
+class HorizonSummary(BaseModel):
+    rows: list[HorizonRow]
+
+
+class ConsecutiveLossBin(BaseModel):
+    length: int
+    count: int
+
+
+class ConsecutiveLosses(BaseModel):
+    bins: list[ConsecutiveLossBin]
+    max: int
+    avg: float | None = None
+    count: int
+
+
 class Tables(BaseModel):
     monthly_heatmap: MonthlyHeatmap
     weekly_heatmap: WeeklyHeatmap
     eoy: EoyTable
     worst_drawdowns: DrawdownTable
+    horizon_summary: HorizonSummary
+    consecutive_losses: ConsecutiveLosses
 
 
 class AnalysisResponse(BaseModel):
