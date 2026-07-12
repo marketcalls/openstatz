@@ -361,6 +361,8 @@ def serialize_analysis(
     rolling_window: int = 126,
 ) -> dict[str, Any]:
     """The complete analysis payload: metrics + series + tables + meta."""
+    if len(returns) == 0:
+        raise ValueError("`returns` is empty — provide at least one observation.")
     primary = returns
     if isinstance(returns, pd.DataFrame) and returns.shape[1] >= 1:
         primary = returns[returns.columns[0]]
@@ -428,6 +430,8 @@ def serialize_comparison(
     from openstatz import stats
     from openstatz._context import ReturnsContext
 
+    if len(returns) == 0:
+        raise ValueError("`returns` is empty — provide at least one observation.")
     if isinstance(returns, pd.Series):
         returns = returns.to_frame()
     # Make the column names distinct strings.

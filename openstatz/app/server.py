@@ -61,10 +61,26 @@ def create_app():
         version=__version__,
         description="Portfolio analytics — library core served as JSON.",
     )
+    # OpenStatz serves a local tool bound to loopback by default. A wildcard
+    # CORS policy would let any website the user is browsing script requests at
+    # their running server and read the responses, so restrict cross-origin
+    # access to same-machine origins. Override with OPENSTATZ_CORS_ORIGINS
+    # (comma-separated) when intentionally serving a remote UI.
+    import os as _os
+
+    _env_origins = _os.environ.get("OPENSTATZ_CORS_ORIGINS", "").strip()
+    if _env_origins:
+        allow_origins = [o.strip() for o in _env_origins.split(",") if o.strip()]
+    else:
+        allow_origins = [
+            f"http://{h}:{p}"
+            for h in ("localhost", "127.0.0.1")
+            for p in (3000, 5173, 8000)
+        ]
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
+        allow_origins=allow_origins,
+        allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
     )
 
@@ -77,17 +93,16 @@ def create_app():
         try:
             returns = _build_returns(req)
             benchmark = _build_benchmark(req)
+            bundle = serializers.serialize_analysis(
+                returns,
+                benchmark,
+                rf=req.rf,
+                compounded=req.compounded,
+                periods_per_year=req.periods_per_year,
+                rolling_window=req.rolling_window,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-        bundle = serializers.serialize_analysis(
-            returns,
-            benchmark,
-            rf=req.rf,
-            compounded=req.compounded,
-            periods_per_year=req.periods_per_year,
-            rolling_window=req.rolling_window,
-        )
         return AnalysisResponse.model_validate(bundle)
 
     @app.post("/api/analyze/symbol", response_model=AnalysisResponse)
@@ -165,20 +180,28 @@ def create_app():
         names = list(req.strategies.keys())
         if len(names) < 2:
             raise HTTPException(status_code=422, detail="need at least 2 strategies")
-        idx = pd.to_datetime(pd.Index(req.dates))
+        if not req.dates:
+            raise HTTPException(status_code=422, detail="`dates` must not be empty")
+        try:
+            idx = pd.to_datetime(pd.Index(req.dates))
+        except (ValueError, TypeError) as exc:
+            raise HTTPException(status_code=422, detail=f"invalid dates: {exc}") from exc
         for name, vals in req.strategies.items():
             if len(vals) != len(idx):
                 raise HTTPException(
                     status_code=422, detail=f"strategy '{name}' length != dates length"
                 )
         df = pd.DataFrame({n: req.strategies[n] for n in names}, index=idx)
-        bundle = serializers.serialize_comparison(
-            df,
-            rf=req.rf,
-            compounded=req.compounded,
-            periods_per_year=req.periods_per_year,
-            rolling_window=req.rolling_window,
-        )
+        try:
+            bundle = serializers.serialize_comparison(
+                df,
+                rf=req.rf,
+                compounded=req.compounded,
+                periods_per_year=req.periods_per_year,
+                rolling_window=req.rolling_window,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
         return ComparisonResponse.model_validate(bundle)
 
     _mount_ui(app)
@@ -209,20 +232,27 @@ def _mount_ui(app) -> None:
     static = _static_dir()
     if static is None:
         return
+    static_root = static.resolve()
 
     # Hashed assets under /assets; index.html for everything else (single page).
     app.mount("/assets", StaticFiles(directory=static / "assets"), name="assets")
 
     @app.get("/", include_in_schema=False)
     def _index():
-        return FileResponse(static / "index.html")
+        return FileResponse(static_root / "index.html")
 
     @app.get("/{path:path}", include_in_schema=False)
     def _spa(path: str):
-        candidate = static / path
-        if candidate.is_file():
+        # Resolve the requested path and confirm it stays inside the static
+        # root before serving it. Without this containment check a request like
+        # `GET /%2e%2e/secret` (URL-encoded `..`, which bypasses client-side
+        # path normalization) would let FileResponse read arbitrary files off
+        # disk. Anything outside the root — or not a real file — falls back to
+        # index.html so client-side routing still works.
+        candidate = (static_root / path).resolve()
+        if (candidate == static_root or static_root in candidate.parents) and candidate.is_file():
             return FileResponse(candidate)
-        return FileResponse(static / "index.html")
+        return FileResponse(static_root / "index.html")
 
 
 def run_server(host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> None:
