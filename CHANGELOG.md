@@ -3,6 +3,16 @@
 All notable changes to OpenStatz are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.4.1]
+
+### Fixed
+- **PyPI project metadata pointed at the upstream QuantStats repo** (#1). The Homepage /
+  Documentation / Repository links and the author/maintainer email all referenced
+  `ranaroussi/quantstats` and its maintainer. Project URLs now point to
+  [openalgo.in](https://openalgo.in) and `marketcalls/openstatz` (plus Issues and Changelog), and
+  the authors/maintainers are OpenAlgo and marketcalls. The QuantStats attribution remains in
+  `NOTICE`, `LICENSE.txt`, the README, and the source headers, as Apache-2.0 requires.
+
 ## [0.4.0]
 
 ### Added

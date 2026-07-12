@@ -10,8 +10,12 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
 authors = [
-    { name = "OpenStatz contributors" },
-    { name = "Ran Aroussi", email = "ran@aroussi.com" },
+    { name = "OpenAlgo", email = "rajandran@openalgo.in" },
+    { name = "marketcalls", email = "rajandran@marketcalls.in" },
+]
+maintainers = [
+    { name = "OpenAlgo", email = "rajandran@openalgo.in" },
+    { name = "marketcalls", email = "rajandran@marketcalls.in" },
 ]
 keywords = [
     "quant",
@@ -88,9 +92,11 @@ dev = [
 openstatz = "openstatz.app.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/ranaroussi/quantstats"
-Documentation = "https://github.com/ranaroussi/quantstats"
-Repository = "https://github.com/ranaroussi/quantstats"
+Homepage = "https://openalgo.in"
+Documentation = "https://github.com/marketcalls/openstatz"
+Repository = "https://github.com/marketcalls/openstatz"
+Issues = "https://github.com/marketcalls/openstatz/issues"
+Changelog = "https://github.com/marketcalls/openstatz/blob/main/CHANGELOG.md"
 
 [tool.hatch.version]
 path = "openstatz/version.py"

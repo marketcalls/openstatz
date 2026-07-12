@@ -1,8 +1,15 @@
 # OpenStatz
 
+[![PyPI version](https://img.shields.io/pypi/v/openstatz.svg)](https://pypi.org/project/openstatz/)
+[![Python versions](https://img.shields.io/pypi/pyversions/openstatz.svg)](https://pypi.org/project/openstatz/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](./LICENSE.txt)
+[![Website](https://img.shields.io/badge/web-openalgo.in-0aa)](https://openalgo.in)
+
 OpenStatz is a modern rebuild of [QuantStats](https://github.com/ranaroussi/quantstats). It gives
-you the same portfolio analytics and the same numbers, plus an optional web tearsheet you can open
-in a browser.
+you the same portfolio analytics and the same numbers, plus a modern, interactive web tearsheet you
+can open in a browser — all in a single offline HTML file, no server required.
+
+Maintained by [OpenAlgo](https://openalgo.in) and marketcalls.
 
 ![OpenStatz tearsheet](https://raw.githubusercontent.com/marketcalls/openstatz/main/docs/images/snapshot.png)
 
@@ -14,6 +21,29 @@ in a browser.
 - Or run the same dashboard as a live server (`openstatz serve`) to type tickers and upload CSVs.
 - Send your backtest returns (a CSV file or a pandas Series) and get a full report.
 - Compare several strategies side by side and see which one is better on each metric.
+
+## Inside the tearsheet
+
+The dashboard is organized into scannable sections — equity and rolling stats, risk, seasonality,
+and return distribution — with light and dark themes and one-click PDF export.
+
+**Performance** — equity curve, rolling Sharpe / volatility / win-rate, and a *Return & Risk by
+Horizon* table (CAGR, max drawdown and Calmar over trailing 1Y / 3Y / 5Y / all-time windows):
+
+![Performance section](https://raw.githubusercontent.com/marketcalls/openstatz/main/docs/images/performance.png)
+
+**Risk** — underwater drawdown curve, tail and exposure metrics, the worst drawdown episodes, and
+the distribution of consecutive losing streaks:
+
+![Risk section](https://raw.githubusercontent.com/marketcalls/openstatz/main/docs/images/risk.png)
+
+**Seasonality** — monthly and weekly return heatmaps and end-of-year returns vs the benchmark:
+
+![Monthly heatmap](https://raw.githubusercontent.com/marketcalls/openstatz/main/docs/images/monthly_heatmap.png)
+
+**Distribution** — return histogram with a mean marker, and a daily-vs-monthly spread box plot:
+
+![Return distribution](https://raw.githubusercontent.com/marketcalls/openstatz/main/docs/images/distribution.png)
 
 ## Install
 
