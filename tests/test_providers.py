@@ -63,3 +63,49 @@ def test_openalgo_provider_errors_clearly_without_sdk():
         pytest.skip("OpenAlgo SDK present; skipping the missing-SDK assertion")
     with pytest.raises(ImportError, match="OpenAlgo SDK"):
         p.returns("RELIANCE")
+
+
+class _FakeClient:
+    """Stands in for the OpenAlgo SDK client; records the history() call."""
+
+    def __init__(self):
+        self.calls = []
+
+    def history(self, **kwargs):
+        self.calls.append(kwargs)
+        idx = pd.date_range("2024-01-01", periods=4, freq="D")
+        return pd.DataFrame({"close": [100.0, 101.0, 99.0, 102.0]}, index=idx)
+
+
+def _fake_provider(monkeypatch, **kwargs):
+    p = providers.OpenAlgoProvider(api_key="x", **kwargs)
+    client = _FakeClient()
+    monkeypatch.setattr(p, "_client", lambda: client)
+    return p, client
+
+
+def test_openalgo_provider_defaults_to_broker_api(monkeypatch):
+    p, client = _fake_provider(monkeypatch)
+    out = p.returns("RELIANCE", start_date="2024-01-01", end_date="2024-01-04")
+    assert out.name == "RELIANCE"
+    # "api" is the server default and is not sent, so older SDKs keep working.
+    assert "source" not in client.calls[0]
+
+
+def test_openalgo_provider_reads_historify(monkeypatch):
+    p, client = _fake_provider(monkeypatch, source="db")
+    p.returns("RELIANCE", start_date="2024-01-01", end_date="2024-01-04")
+    assert client.calls[0]["source"] == "db"
+
+
+def test_openalgo_provider_source_per_call(monkeypatch):
+    p, client = _fake_provider(monkeypatch)
+    p.returns("RELIANCE", start_date="2024-01-01", end_date="2024-01-04", source="db")
+    p.returns("RELIANCE", start_date="2024-01-01", end_date="2024-01-04")
+    assert client.calls[0]["source"] == "db"
+    assert "source" not in client.calls[1]
+
+
+def test_openalgo_provider_rejects_unknown_source():
+    with pytest.raises(ValueError, match="Historify"):
+        providers.OpenAlgoProvider(api_key="x", source="cache")

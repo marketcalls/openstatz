@@ -192,8 +192,8 @@ def dashboard(
 
     Examples
     --------
-    >>> import openstatz as os
-    >>> os.dashboard(returns, benchmark, output="report.html")
+    >>> import openstatz as ostz
+    >>> ostz.dashboard(returns, benchmark, output="report.html")
     """
     html = build_report_html(
         returns,

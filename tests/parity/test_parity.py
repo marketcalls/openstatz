@@ -36,6 +36,17 @@ import openstatz  # noqa: E402
 RTOL = 1e-9
 ATOL = 1e-12
 
+# Deliberate label divergences from QuantStats, and the only ones. QuantStats
+# spells these with U+FE6A (small percent sign) and U+221A (square root), which
+# nobody can type and a cp1252 Windows console cannot print. OpenStatz uses ASCII.
+# The reference labels are translated before comparing, so every cell under
+# them is still checked exactly.
+LABEL_RENAMES = {
+    "CAGR\ufe6a": "CAGR%",
+    "Sortino/\u221a2": "Sortino/sqrt(2)",
+    "Smart Sortino/\u221a2": "Smart Sortino/sqrt(2)",
+}
+
 _FIXTURE_FILES = sorted(FIXTURES.glob("*.pkl"))
 
 
@@ -141,6 +152,7 @@ def _compare_series(exp, act):
 def _compare_frame(exp, act):
     if not isinstance(act, pd.DataFrame):
         return False, f"type {type(act).__name__} != DataFrame"
+    exp = exp.rename(index=LABEL_RENAMES)
     if list(exp.index) != list(act.index):
         return False, "row labels/order mismatch"
     if list(exp.columns) != list(act.columns):

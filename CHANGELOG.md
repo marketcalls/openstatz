@@ -3,6 +3,68 @@
 All notable changes to OpenStatz are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [0.5.0]
+
+This release makes the modern tearsheet (`openstatz.dashboard(...)` and `openstatz serve`) report
+the numbers the library computes. Several cards, tables and charts were showing rounded, mislabelled
+or stale values. Upgrade if you share these reports; nothing in the classic `reports.html(...)`
+output changes except three row labels.
+
+### Breaking
+- **Three metric labels are now plain ASCII.** `CAGR﹪` is `CAGR%`, `Sortino/√2` is
+  `Sortino/sqrt(2)`, and `Smart Sortino/√2` is `Smart Sortino/sqrt(2)`. Code that looks rows up
+  by the old QuantStats spelling (`metrics.loc["CAGR﹪"]`) must use the new one. The old labels
+  could not be typed, and `print(metrics)` or `reports.metrics(..., display=True)` raised
+  `UnicodeEncodeError` on a Windows console using cp1252. These are the only differences from
+  QuantStats output; the parity gate checks every number under them. See `docs/parity.md`.
+
+### Added
+- `reports.metrics(..., display=False, raw=True)` returns every metric at full precision. The
+  default output still rounds to 2 decimals exactly as QuantStats does, which turns a 13.52% CAGR
+  into 0.14 because percentages are fractions there. With `raw=True`, Beta, Alpha, Correlation and
+  Treynor Ratio are numbers rather than strings, and `df.attrs["percent_rows"]` and
+  `df.attrs["integer_rows"]` say which rows are percentages and counts.
+- `OpenAlgoProvider` takes `source="api"` (history from your broker, the default) or `source="db"`
+  (history from OpenAlgo's Historify database), on the constructor or per `returns()` call. The
+  default path sends nothing new, so older OpenAlgo SDKs keep working.
+- The Worst Drawdowns rows in the API carry `ongoing: true` for a drawdown still underwater at
+  the last date.
+
+### Fixed
+- **Tearsheet values were rounded before display.** CAGR 13.52% showed as 14.00%, max drawdown
+  -31.65% as -32.00%, and volatility, time in market, MTD, YTD, 3M, 6M and 1Y the same way, while
+  the Return and Risk by Horizon table showed the true value. The full metrics table showed raw
+  fractions ("0.14"). Every card and table cell now shows the full-precision value, with
+  percentages formatted as percentages.
+- **Correlation and Treynor Ratio were shown as percentages** ("0.32%" for a correlation of 0.32).
+  They are plain numbers now.
+- **Charts could show another series' data.** The prepared-returns cache keyed on values alone,
+  so analysing the same returns under a new name (`dashboard(s.rename("B"))` after using
+  `s.rename("A")`, or after calling `stats.*` on a DataFrame column) keyed the cumulative and
+  rolling charts under the old name: the equity chart showed only the benchmark and the rolling
+  Sharpe, volatility and win-rate charts were blank. The key now includes the series name or
+  DataFrame columns. It also includes whether excess returns were taken, so with `rf > 0` a
+  result no longer depends on which function ran first (`stats.rar(r, rf=0.05)` returned a
+  different value after `stats.cagr(r, rf=0.05)`).
+- **Worst Drawdowns listed an ongoing drawdown as recovered** on the last date of the data. The
+  Recovered column now reads "Not yet".
+- **Worst Drawdowns was not sorted by the depth it showed.** It sorted by the full drawdown but
+  displayed QuantStats' "99% max drawdown", so rows appeared out of order and the deepest row
+  disagreed with the Max Drawdown metric. It now shows the full depth it sorts by.
+- **The monthly heatmap filled months with no data as 0.0**, both after the last date and before
+  the first. Those cells are blank now, and they no longer skew the monthly box plot.
+- **Stray tick labels at the end of chart axes.** A multi-year axis could end in a bare day of the
+  month ("9") or month ("Jul"). Axes now label only the tick marks that suit the time span shown.
+- **The header and the metrics disagreed on the start date.** With a benchmark, the metrics skip
+  the leading zero returns (Start Period 2016-10-04) while the header, charts and tables used the
+  first row (2016-09-27, with more observations). Everything now uses the metrics' window.
+- `reports.html(...)` and `reports.full(...)` raised `TypeError` for a one-column DataFrame. It
+  had only worked when the stale cache entry above happened to hand them a Series.
+
+### Docs
+- Examples use `import openstatz as ostz`. The old `import openstatz as os` hid Python's own `os`
+  module, so the examples broke in any script that also needed it.
+
 ## [0.4.1]
 
 ### Fixed

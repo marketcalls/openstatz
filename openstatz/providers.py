@@ -58,9 +58,14 @@ class OpenAlgoProvider:
         OpenAlgo server URL.
     exchange : str, default "NSE"
     interval : str, default "D"
+    source : {"api", "db"}, default "api"
+        Where OpenAlgo reads the history from: ``"api"`` asks the broker,
+        ``"db"`` reads the local Historify database. Can be overridden per call.
     """
 
     name = "openalgo"
+
+    SOURCES = ("api", "db")
 
     def __init__(
         self,
@@ -68,11 +73,22 @@ class OpenAlgoProvider:
         host: str = "http://127.0.0.1:5000",
         exchange: str = "NSE",
         interval: str = "D",
+        source: str = "api",
     ):
         self.api_key = api_key
         self.host = host
         self.exchange = exchange
         self.interval = interval
+        self.source = self._check_source(source)
+
+    @classmethod
+    def _check_source(cls, source: str) -> str:
+        if source not in cls.SOURCES:
+            raise ValueError(
+                f"source must be 'api' (history from your broker) or 'db' "
+                f"(history from Historify), not {source!r}"
+            )
+        return source
 
     def _client(self):
         try:
@@ -91,15 +107,22 @@ class OpenAlgoProvider:
         end_date: str | None = None,
         exchange: str | None = None,
         interval: str | None = None,
+        source: str | None = None,
     ) -> pd.Series:
+        source = self._check_source(source or self.source)
         client = self._client()
-        df = client.history(
-            symbol=symbol,
-            exchange=exchange or self.exchange,
-            interval=interval or self.interval,
-            start_date=start_date,
-            end_date=end_date,
-        )
+        params = {
+            "symbol": symbol,
+            "exchange": exchange or self.exchange,
+            "interval": interval or self.interval,
+            "start_date": start_date,
+            "end_date": end_date,
+        }
+        # "api" is the server's default, so it is left out: an OpenAlgo SDK
+        # older than the `source` argument keeps working on the default path.
+        if source != "api":
+            params["source"] = source
+        df = client.history(**params)
         if not isinstance(df, pd.DataFrame) or "close" not in {c.lower() for c in df.columns}:
             raise ValueError(f"OpenAlgo returned no usable history for {symbol!r}: {df!r}")
         # Normalize the close column name and compute returns.

@@ -14,7 +14,7 @@
 
 ## 0. TL;DR
 
-- **OpenStatz stays a normal Python library.** `pip install openstatz` → `import openstatz as os`
+- **OpenStatz stays a normal Python library.** `pip install openstatz` → `import openstatz as ostz`
   behaves exactly like `quantstats` (same functions, same numbers, `extend_pandas()`).
 - **The web UI is an optional layer**, not a replacement. `pip install openstatz[app]`
   adds a FastAPI server + a modern React UI that *imports the same library core*.
@@ -32,15 +32,14 @@ OpenStatz is **library-first**. The layering guarantees three usage modes from o
 
 | Mode | Install | Usage |
 |---|---|---|
-| Library (drop-in) | `pip install openstatz` | `import openstatz as os; os.stats.sharpe(r)` |
-| Pandas extension | `pip install openstatz` | `os.extend_pandas(); r.sharpe()` |
+| Library (drop-in) | `pip install openstatz` | `import openstatz as ostz; ostz.stats.sharpe(r)` |
+| Pandas extension | `pip install openstatz` | `ostz.extend_pandas(); r.sharpe()` |
 | Web app | `pip install openstatz[app]` | `openstatz serve` → browser UI |
 
-> **Alias caveat:** the documented alias is `os` (`import openstatz as os`). This intentionally
-> shadows Python's standard-library `os` module within any file that uses it — `os.path`,
-> `os.getcwd()`, etc. will not be available there. Code that needs the stdlib alongside OpenStatz
-> should `import os as _os` (or import OpenStatz under a different name in that file). The library
-> itself never relies on the alias, so this only affects user scripts.
+> **Alias:** the documented alias is `ostz` (`import openstatz as ostz`). Releases before 0.5.0
+> documented `os`, which shadows Python's standard-library `os` module in any file that uses it
+> (`os.path`, `os.getcwd()` and the rest stop working there), so examples broke in any script
+> that also needed the stdlib. The library itself never relied on the alias.
 
 The core never imports FastAPI, matplotlib-for-web, or any UI dependency. I/O and presentation
 live in adapters. This is what keeps the library lean and embeddable while the app sits on top.
@@ -301,8 +300,8 @@ the identical array.
 ## 10. Compatibility / migration notes
 
 - **Public API identical** to quantstats so existing user code works by changing only the import
-  (`import openstatz as os`). Note: quantstats tutorials use the `qs` alias; either alias works,
-  but the documented OpenStatz convention is `os` (see the alias caveat in §1). Optionally ship a
+  (`import openstatz as ostz`). Note: quantstats tutorials use the `qs` alias; either alias works,
+  but the documented OpenStatz convention is `ostz` (see the alias note in §1). Optionally ship a
   thin `quantstats` shim that re-exports openstatz.
 - pandas at the edges keeps `extend_pandas()` and all DataFrame/Series semantics intact.
 - HTML `reports.html()` retained (matplotlib path) so the *library* output matches byte-for-byte;

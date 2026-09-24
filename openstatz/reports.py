@@ -135,6 +135,19 @@ def _print_parameters_table(
     print()
 
 
+def _single_column_as_series(returns):
+    """A one-column DataFrame is analysed as the Series it holds.
+
+    html() and full() title a DataFrame by assigning ``returns.columns``, which
+    only works with one title per column; a single column with the default
+    string title raised ``TypeError``. (A stale cache entry used to hand these
+    functions a Series instead, which is the only reason it ever worked.)
+    """
+    if isinstance(returns, _pd.DataFrame) and len(returns.columns) == 1:
+        return returns[returns.columns[0]]
+    return returns
+
+
 def _match_dates(returns, benchmark):
     """
     Align returns and benchmark data to start from the same date.
@@ -276,6 +289,7 @@ def html(
         returns = returns.dropna()
     # Clean and prepare returns data for analysis
     returns = _get_utils()._prepare_returns(returns)
+    returns = _single_column_as_series(returns)
 
     # Handle strategy title - can be single string or list for multiple columns
     strategy_title = kwargs.get("strategy_title", "Strategy")
@@ -837,6 +851,7 @@ def full(
         returns = returns.dropna()
     # Clean and prepare returns data
     returns = _get_utils()._prepare_returns(returns)
+    returns = _single_column_as_series(returns)
 
     # Process benchmark if provided
     if benchmark is not None:
@@ -1181,6 +1196,13 @@ def metrics(
         - benchmark_title: Custom name for the benchmark
         - as_pct: Whether to return percentages
         - internal: Internal calculation flag
+        - raw: With ``display=False``, return every metric at full precision
+          instead of rounded to 2 decimals as QuantStats does. Percentage
+          metrics stay fractions (0.1352 for 13.52%), and Beta, Alpha,
+          Correlation and Treynor Ratio come back as floats rather than
+          formatted strings. The labels of the percentage and integer rows are
+          listed in ``df.attrs["percent_rows"]`` and ``df.attrs["integer_rows"]``.
+          Default False keeps the output identical to QuantStats.
 
     Returns
     -------
@@ -1294,11 +1316,18 @@ def metrics(
     if kwargs.get("as_pct", False):
         pct = 100
 
+    # Machine-readable output (OpenStatz): full precision, no string cells.
+    raw = bool(kwargs.get("raw", False)) and not (display or "internal" in kwargs)
+
+    def _rnd(value, ndigits=2):
+        # QuantStats rounds these cells; raw mode keeps full precision.
+        return value if raw else round(value, ndigits)
+
     # Initialize metrics DataFrame with basic information
     metrics = _pd.DataFrame()
     metrics["Start Period"] = _pd.Series(s_start)
     metrics["End Period"] = _pd.Series(s_end)
-    metrics["Risk-Free Rate %"] = _pd.Series(s_rf) * 100
+    metrics["Risk-Free Rate %"] = _pd.Series(s_rf) * (pct if raw else 100)
     metrics["Time in Market %"] = _get_stats().exposure(df, prepare_returns=False) * pct
 
     # Add separator row
@@ -1306,12 +1335,16 @@ def metrics(
 
     # Calculate return metrics based on compounding preference
     if compounded:
-        metrics["Cumulative Return %"] = (_get_stats().comp(df) * pct).map("{:,.2f}".format)
+        metrics["Cumulative Return %"] = _get_stats().comp(df) * pct
+        if not raw:
+            metrics["Cumulative Return %"] = metrics["Cumulative Return %"].map("{:,.2f}".format)
     else:
-        metrics["Total Return %"] = (df.sum() * pct).map("{:,.2f}".format)
+        metrics["Total Return %"] = df.sum() * pct
+        if not raw:
+            metrics["Total Return %"] = metrics["Total Return %"].map("{:,.2f}".format)
 
     # Calculate annualized return (CAGR)
-    metrics["CAGR﹪%"] = _get_stats().cagr(df, rf, compounded, win_year) * pct
+    metrics["CAGR%%"] = _get_stats().cagr(df, rf, compounded, win_year) * pct
 
     # Add separator row
     metrics["~~~~~~~~~~~~~~"] = blank
@@ -1336,11 +1369,11 @@ def metrics(
         #     df, rf, win_year, False, True) * pct
 
     # Calculate adjusted Sortino ratio
-    metrics["Sortino/√2"] = metrics["Sortino"] / _sqrt(2)
+    metrics["Sortino/sqrt(2)"] = metrics["Sortino"] / _sqrt(2)
     if mode.lower() == "full":
         # metrics['Prob. Sortino/√2 Ratio %'] = _get_stats().probabilistic_adjusted_sortino_ratio(
         #     df, rf, win_year, False) * pct
-        metrics["Smart Sortino/√2"] = metrics["Smart Sortino"] / _sqrt(2)
+        metrics["Smart Sortino/sqrt(2)"] = metrics["Smart Sortino"] / _sqrt(2)
         # metrics['Prob. Smart Sortino/√2 Ratio %'] = _get_stats().probabilistic_adjusted_sortino_ratio(
         #     df, rf, win_year, False, True) * pct
 
@@ -1413,17 +1446,17 @@ def metrics(
             elif isinstance(returns, _pd.DataFrame):
                 metrics["R^2"] = (
                     [
-                        _get_stats().r_squared(
+                        _rnd(_get_stats().r_squared(
                             df[strategy_col], df["benchmark"], prepare_returns=False
-                        ).round(2)
+                        ))
                         for strategy_col in df_strategy_columns
                     ]
                 ) + ["-"]
                 metrics["Information Ratio"] = (
                     [
-                        _get_stats().information_ratio(
+                        _rnd(_get_stats().information_ratio(
                             df[strategy_col], df["benchmark"], prepare_returns=False
-                        ).round(2)
+                        ))
                         for strategy_col in df_strategy_columns
                     ]
                 ) + ["-"]
@@ -1651,28 +1684,34 @@ def metrics(
         # Greek letters and correlation analysis (if benchmark exists)
         if "benchmark" in df:
             metrics["~~~~~~~~~~~~"] = blank
+
+            def _cell(value, scale=1, suffix=""):
+                # QuantStats formats these as strings; Correlation and Treynor
+                # get a "%" even though neither is a percentage. Raw mode
+                # returns the plain number instead.
+                if raw:
+                    return value
+                return str(round(value * scale, 2)) + suffix
+
             if isinstance(returns, _pd.Series):
                 # Calculate Greek letters (Beta, Alpha) for single strategy
                 greeks = _get_stats().greeks(
                     df["returns"], df["benchmark"], win_year, prepare_returns=False
                 )
-                metrics["Beta"] = [str(round(greeks["beta"], 2)), "-"]
-                metrics["Alpha"] = [str(round(greeks["alpha"], 2)), "-"]
+                metrics["Beta"] = [_cell(greeks["beta"]), "-"]
+                metrics["Alpha"] = [_cell(greeks["alpha"]), "-"]
                 metrics["Correlation"] = [
-                    str(round(df["benchmark"].corr(df["returns"]) * pct, 2)) + "%",
+                    _cell(df["benchmark"].corr(df["returns"]), pct, "%"),
                     "-",
                 ]
                 metrics["Treynor Ratio"] = [
-                    str(
-                        round(
-                            _get_stats().treynor_ratio(
-                                df["returns"], df["benchmark"], win_year, rf
-                            )
-                            * pct,
-                            2,
-                        )
-                    )
-                    + "%",
+                    _cell(
+                        _get_stats().treynor_ratio(
+                            df["returns"], df["benchmark"], win_year, rf
+                        ),
+                        pct,
+                        "%",
+                    ),
                     "-",
                 ]
             elif isinstance(returns, _pd.DataFrame):
@@ -1686,27 +1725,23 @@ def metrics(
                     )
                     for strategy_col in df_strategy_columns
                 ]
-                metrics["Beta"] = [str(round(g["beta"], 2)) for g in greeks] + ["-"]
-                metrics["Alpha"] = [str(round(g["alpha"], 2)) for g in greeks] + ["-"]
+                metrics["Beta"] = [_cell(g["beta"]) for g in greeks] + ["-"]
+                metrics["Alpha"] = [_cell(g["alpha"]) for g in greeks] + ["-"]
                 metrics["Correlation"] = (
                     [
-                        str(round(df["benchmark"].corr(df[strategy_col]) * pct, 2))
-                        + "%"
+                        _cell(df["benchmark"].corr(df[strategy_col]), pct, "%")
                         for strategy_col in df_strategy_columns
                     ]
                 ) + ["-"]
                 metrics["Treynor Ratio"] = (
                     [
-                        str(
-                            round(
-                                _get_stats().treynor_ratio(
-                                    df[strategy_col], df["benchmark"], win_year, rf
-                                )
-                                * pct,
-                                2,
-                            )
+                        _cell(
+                            _get_stats().treynor_ratio(
+                                df[strategy_col], df["benchmark"], win_year, rf
+                            ),
+                            pct,
+                            "%",
                         )
-                        + "%"
                         for strategy_col in df_strategy_columns
                     ]
                 ) + ["-"]
@@ -1716,7 +1751,9 @@ def metrics(
     for col in metrics.columns:
         try:
             # Try to convert to float and round
-            metrics[col] = metrics[col].astype(float).round(2)
+            metrics[col] = metrics[col].astype(float)
+            if not raw:
+                metrics[col] = metrics[col].round(2)
             if display or "internal" in kwargs:
                 metrics[col] = metrics[col].astype(str)
         except (ValueError, TypeError, AttributeError):
@@ -1747,6 +1784,19 @@ def metrics(
         if display or "internal" in kwargs:
             metrics["Longest DD Days"] = "-"
             metrics["Avg. Drawdown Days"] = "-"
+
+    # Raw mode reports which rows are percentages and which are counts, since
+    # the "%" and "*int" markers are stripped from the labels below.
+    def _final_label(col):
+        col = col[:-1] if "%" in col else col
+        return col.replace(" %", "").replace(" *int", "").strip()
+
+    percent_rows = [_final_label(c) for c in metrics.columns if "%" in c and "~" not in c]
+    integer_rows = [
+        _final_label(c)
+        for c in metrics.columns
+        if "*int" in c or c in ("Longest DD Days", "Avg. Drawdown Days")
+    ]
 
     # Clean up column names (remove separators and percentage signs)
     metrics.columns = [col if "~" not in col else "" for col in metrics.columns]
@@ -1828,6 +1878,10 @@ def metrics(
         c.replace(" %", "").replace(" *int", "").strip() for c in metrics.columns
     ]
     metrics = metrics.T
+
+    if raw:
+        metrics.attrs["percent_rows"] = percent_rows
+        metrics.attrs["integer_rows"] = integer_rows
 
     return metrics
 

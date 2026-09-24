@@ -5,7 +5,9 @@ import {
   LineSeries,
   AreaSeries,
   BaselineSeries,
+  TickMarkType,
   type IChartApi,
+  type TickMarkFormatter,
   type UTCTimestamp,
 } from "lightweight-charts";
 
@@ -43,6 +45,26 @@ function toRgb(color: string, fallback: string): string {
 
 function cssVar(name: string, fallback: string): string {
   return toRgb(`var(${name})`, fallback);
+}
+
+// Label only the tick marks that suit the span on screen. On a multi-year axis
+// labelled by year, lightweight-charts fills a leftover gap at an edge with a
+// finer mark, so the axis ended "... 2025 2026 9" (a day of the month) or
+// "... 2024 Jul". Finer marks keep their slot but get no text; short spans
+// still show months and days as usual. `null` keeps the library's own text.
+function spanTickFormatter(series: ChartSeries[]): TickMarkFormatter {
+  let min = Infinity;
+  let max = -Infinity;
+  for (const s of series) {
+    for (const p of s.data) {
+      if (p.time < min) min = p.time;
+      if (p.time > max) max = p.time;
+    }
+  }
+  const spanDays = max > min ? (max - min) / 86400 : 0;
+  const finest =
+    spanDays > 730 ? TickMarkType.Year : spanDays > 92 ? TickMarkType.Month : null;
+  return (_time, type) => (finest !== null && type > finest ? "" : null);
 }
 
 // "rgb(r, g, b)" -> "rgba(r, g, b, a)" for translucent area fills.
@@ -89,7 +111,12 @@ export function TimeSeriesChart({
         horzLines: { color: grid },
       },
       rightPriceScale: { borderColor: "transparent" },
-      timeScale: { borderColor: "transparent", fixLeftEdge: true, fixRightEdge: true },
+      timeScale: {
+        borderColor: "transparent",
+        fixLeftEdge: true,
+        fixRightEdge: true,
+        tickMarkFormatter: spanTickFormatter(series),
+      },
       crosshair: { mode: 0 },
       localization: {
         priceFormatter:

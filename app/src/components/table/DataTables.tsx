@@ -86,10 +86,16 @@ export function WorstDrawdownsTable({ rows }: { rows: DrawdownRow[] }) {
         {rows.map((r, i) => (
           <tr key={i} className="border-b border-hair/60">
             <td className="py-1.5 px-3 nums text-muted">{r.start}</td>
-            <td className="py-1.5 px-3 nums text-muted">{r.end}</td>
+            <td
+              className={`py-1.5 px-3 nums ${r.ongoing ? "text-pnl-neg" : "text-muted"}`}
+              title={r.ongoing ? `Still underwater as of ${r.end}` : undefined}
+            >
+              {r.ongoing ? "Not yet" : r.end}
+            </td>
             <td className="py-1.5 px-3 text-right nums">{fmtNumber(r.days, 0)}</td>
             <td className="py-1.5 px-3 text-right nums text-pnl-neg">
-              {/* drawdown_pct is already a percent magnitude (e.g. -19.3) */}
+              {/* drawdown_pct is the full depth as a percent magnitude (e.g. -19.3),
+                  the same number the rows are sorted by */}
               {r.drawdown_pct === null ? "—" : `${fmtNumber(r.drawdown_pct, 2)}%`}
             </td>
           </tr>

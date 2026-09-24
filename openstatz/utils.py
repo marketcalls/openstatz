@@ -107,9 +107,14 @@ _CACHE_MAX_SIZE = 100
 _cache_lock = threading.Lock()
 
 
-def _generate_cache_key(data, rf, nperiods):
+def _generate_cache_key(data, rf, nperiods, excess=False):
     """
     Generate a cache key for the _prepare_returns function
+
+    The key covers everything the cached result depends on: the values and
+    index, the Series name or DataFrame column labels (the result carries them,
+    so two series with equal values but different names must not share an
+    entry), the parameters, and whether excess returns were taken.
 
     Parameters
     ----------
@@ -119,6 +124,8 @@ def _generate_cache_key(data, rf, nperiods):
         Risk-free rate parameter
     nperiods : int
         Number of periods parameter
+    excess : bool, default False
+        Whether the caller gets rf-adjusted (excess) returns
 
     Returns
     -------
@@ -126,16 +133,19 @@ def _generate_cache_key(data, rf, nperiods):
         Cache key string or None if hashing fails
     """
     try:
-        # Create a hash from the data
+        # Create a hash from the data (values and index)
         if isinstance(data, _pd.Series):
             data_hash = _pd.util.hash_pandas_object(data).sum()
+            labels = repr(data.name)
         elif isinstance(data, _pd.DataFrame):
             data_hash = _pd.util.hash_pandas_object(data).sum()
+            labels = repr(tuple(data.columns))
         else:
             data_hash = hash(str(data))
+            labels = ""
 
-        # Include parameters in the key
-        key = f"{data_hash}_{rf}_{nperiods}"
+        # Include labels and parameters in the key
+        key = f"{data_hash}_{labels}_{rf}_{nperiods}_{bool(excess)}"
         return key
     except (ValueError, TypeError, AttributeError, MemoryError):
         # If hashing fails, return None to skip caching
@@ -598,16 +608,29 @@ def _prepare_returns(data, rf=0.0, nperiods=None):
     pd.Series or pd.DataFrame
         Cleaned returns data
     """
+    # Get calling function name for conditional processing. It decides whether
+    # excess returns are taken, so it is part of the cache key.
+    frame = inspect.currentframe()
+    function = frame.f_back.f_code.co_name if frame and frame.f_back else ""
+    del frame
+
+    # Functions that don't need excess returns calculation
+    unnecessary_function_calls = [
+        "_prepare_benchmark",
+        "cagr",
+        "gain_to_pain_ratio",
+        "rolling_volatility",
+    ]
+    excess = function not in unnecessary_function_calls and rf > 0
+
     # Try to get from cache first
-    cache_key = _generate_cache_key(data, rf, nperiods)
+    cache_key = _generate_cache_key(data, rf, nperiods, excess)
     if cache_key:
         with _cache_lock:
             if cache_key in _PREPARE_RETURNS_CACHE:
                 return _PREPARE_RETURNS_CACHE[cache_key].copy()
 
     data = data.copy()
-    # Get calling function name for conditional processing
-    function = inspect.stack()[1][3]
 
     # Process DataFrame columns
     if isinstance(data, _pd.DataFrame):
@@ -628,24 +651,15 @@ def _prepare_returns(data, rf=0.0, nperiods=None):
     if isinstance(data, (_pd.DataFrame, _pd.Series)):
         data = data.fillna(0).replace([_np.inf, -_np.inf], float("NaN"))
 
-    # Functions that don't need excess returns calculation
-    unnecessary_function_calls = [
-        "_prepare_benchmark",
-        "cagr",
-        "gain_to_pain_ratio",
-        "rolling_volatility",
-    ]
-
     # Calculate excess returns if rf > 0 and function needs it
-    if function not in unnecessary_function_calls:
-        if rf > 0:
-            result = to_excess_returns(data, rf, nperiods)
-            # Cache the result
-            if cache_key:
-                _clear_cache_if_full()
-                with _cache_lock:
-                    _PREPARE_RETURNS_CACHE[cache_key] = result.copy()
-            return result
+    if excess:
+        result = to_excess_returns(data, rf, nperiods)
+        # Cache the result
+        if cache_key:
+            _clear_cache_if_full()
+            with _cache_lock:
+                _PREPARE_RETURNS_CACHE[cache_key] = result.copy()
+        return result
 
     # Normalize timezone information for consistency
     # Convert to UTC if timezone-aware, then make naive

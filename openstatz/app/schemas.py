@@ -138,6 +138,9 @@ class DrawdownRow(BaseModel):
     days: float | None = None
     max_drawdown: float | None = None
     drawdown_pct: float | None = None
+    # True when the episode is still underwater at the last date; `end` is then
+    # the last date of the data, not a recovery.
+    ongoing: bool = False
 
 
 class DrawdownTable(BaseModel):
