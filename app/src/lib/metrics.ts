@@ -3,10 +3,11 @@ import type { MetricRow, MetricsTable } from "../api/types";
 // Anything carrying a metrics table (AnalysisResponse or ComparisonResponse).
 type HasMetrics = { metrics: MetricsTable };
 
-// reports.metrics uses some non-ASCII labels (e.g. "CAGR﹪" with U+FE6A, "R^2").
-// Normalize away percent signs / case / spacing so lookups by a clean name still
-// resolve — this is why the old "CAGR" card showed nothing.
-const STRIP = /[﹪%]/g;
+// Metric labels carry percent signs ("CAGR%") that the card specs leave out.
+// Normalize away percent signs / case / spacing so lookups by a clean name
+// resolve. U+FE6A stays in the class for payloads written before 0.5.0, when
+// the label was QuantStats' "CAGR\uFE6A".
+const STRIP = /[\uFE6A%]/g;
 
 export function normLabel(s: string): string {
   return s.replace(STRIP, "").replace(/\s+/g, " ").trim().toLowerCase();

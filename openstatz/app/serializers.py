@@ -92,8 +92,14 @@ def serialize_metrics(
                  "display": {"Strategy": "0.74", ...}}, ... ]
     }
 
-    ``display`` preserves the exact reports.metrics formatting; ``values`` is the
-    same cell parsed back to a float when possible (None otherwise).
+    ``values`` holds each cell at full precision (percentages as fractions,
+    0.1352 for 13.52%), or None for a non-numeric cell such as a date.
+    ``display`` is the same cell as a person reads it: "13.52%", "0.74",
+    "2,135", or the text itself.
+
+    The values come from ``reports.metrics(raw=True)``, never from its default
+    output, which rounds every cell to 2 decimals the way QuantStats does. On a
+    fraction that turns a 13.52% CAGR into 0.14, so nothing here may read it.
     """
     from openstatz import reports
 
@@ -106,7 +112,10 @@ def serialize_metrics(
         display=False,
         mode="full",
         sep=False,
+        raw=True,
     )
+    percent_rows = set(df.attrs.get("percent_rows", ()))
+    integer_rows = set(df.attrs.get("integer_rows", ()))
 
     # reports.metrics labels a single series' column "Strategy" (and the
     # benchmark "Benchmark"). Relabel to the actual series names so the metrics
@@ -138,10 +147,22 @@ def serialize_metrics(
     columns = [str(c) for c in df.columns]
     rows = []
     for label, row in df.iterrows():
-        display = {str(c): _stringify(row[c]) for c in df.columns}
+        kind = "pct" if label in percent_rows else "int" if label in integer_rows else "num"
         values = {str(c): _parse_number(row[c]) for c in df.columns}
+        display = {str(c): _display_cell(row[c], values[str(c)], kind) for c in df.columns}
         rows.append({"label": str(label), "values": values, "display": display})
     return {"columns": columns, "rows": rows}
+
+
+def _display_cell(raw, value: float | None, kind: str) -> str:
+    """Human-readable text for one metrics cell."""
+    if value is None:
+        return _stringify(raw)
+    if kind == "pct":
+        return f"{value * 100:,.2f}%"
+    if kind == "int":
+        return f"{value:,.0f}"
+    return f"{value:,.2f}"
 
 
 def _stringify(v) -> str:
@@ -152,16 +173,11 @@ def _stringify(v) -> str:
 
 def _parse_number(v) -> float | None:
     """Best-effort parse of a (possibly formatted) metric cell to float."""
-    f = _f(v)
-    if f is not None:
-        return f
-    s = str(v).strip().replace(",", "")
-    if s.endswith("%"):
-        # reports.metrics emits ﹪-labelled metrics as plain fractions (no '%'),
-        # so a trailing '%' here is a cosmetic suffix on an already-scaled number
-        # (e.g. correlation "0.68%"). Strip it; do NOT divide by 100.
-        s = s[:-1].strip()
-    return _f(s)
+    if isinstance(v, str):
+        # Dates, "-" and other text cells. reports.metrics(raw=True) returns
+        # every number as a number, so a string here is never a value.
+        return None
+    return _f(v)
 
 
 # ---------------------------------------------------------------------------
@@ -274,10 +290,21 @@ def serialize_monthly_heatmap(returns: pd.Series, *, compounded: bool = True) ->
     mr = stats.monthly_returns(returns, eoy=False, compounded=compounded)
     months = [str(c) for c in mr.columns]
     years = [str(i) for i in mr.index]
+
+    # monthly_returns fills every month of every year, so the months before the
+    # first observation and after the last come back as 0.0. They have no data:
+    # send null so they render blank instead of as a flat month.
+    observed = pd.DatetimeIndex(returns.dropna().index)
+    first = (observed.min().year, observed.min().month) if len(observed) else None
+    last = (observed.max().year, observed.max().month) if len(observed) else None
+
     cells = []
     for y in mr.index:
-        for m in mr.columns:
-            cells.append({"year": str(y), "month": str(m), "value": _f(mr.at[y, m])})
+        for i, m in enumerate(mr.columns, start=1):
+            value = _f(mr.at[y, m])
+            if first is None or not (first <= (int(y), i) <= last):
+                value = None
+            cells.append({"year": str(y), "month": str(m), "value": value})
     return {"years": years, "months": months, "cells": cells}
 
 
@@ -325,7 +352,13 @@ def serialize_eoy(returns: pd.Series, benchmark: pd.Series | None = None, *, com
 
 
 def serialize_worst_drawdowns(returns: pd.Series, *, top: int = 10) -> dict[str, Any]:
-    """Worst-N drawdown periods (start/valley/end, depth, length)."""
+    """Worst-N drawdown periods (start/valley/end, depth, length), deepest first.
+
+    ``drawdown_pct`` is the episode's full depth (``max drawdown``), the same
+    number the rows are sorted by and the Max Drawdown metric reports.
+    ``ongoing`` is True for an episode still underwater at the last date: its
+    ``end`` is then only the last date of the data, not a recovery.
+    """
     from openstatz import stats
 
     if isinstance(returns, pd.DataFrame):
@@ -336,17 +369,25 @@ def serialize_worst_drawdowns(returns: pd.Series, *, top: int = 10) -> dict[str,
     if details is None or len(details) == 0:
         return {"rows": []}
 
-    details = details.sort_values(by="max drawdown").head(top)
+    # Only the most recent episode can still be open, and only if the series
+    # ends below its high-water mark.
+    underwater = len(dd) > 0 and _f(dd.iloc[-1]) is not None and float(dd.iloc[-1]) < 0
+    latest_start = str(details["start"].max()) if underwater else None
+
+    details = details.sort_values(by="max drawdown", kind="stable").head(top)
     rows = []
     for _, r in details.iterrows():
+        depth = _f(r.get("max drawdown"))
+        start = str(r.get("start", ""))
         rows.append(
             {
-                "start": str(r.get("start", "")),
+                "start": start,
                 "valley": str(r.get("valley", "")),
                 "end": str(r.get("end", "")),
                 "days": _f(r.get("days")),
-                "max_drawdown": _f(r.get("max drawdown")),
-                "drawdown_pct": _f(r.get("99% max drawdown", r.get("max drawdown"))),
+                "max_drawdown": depth,
+                "drawdown_pct": depth,
+                "ongoing": latest_start is not None and start == latest_start,
             }
         )
     return {"rows": rows}
@@ -414,6 +455,38 @@ def serialize_consecutive_losses(returns: pd.Series) -> dict[str, Any]:
 # Full bundle
 # ---------------------------------------------------------------------------
 
+def _naive_index(data: PandasData) -> pd.DatetimeIndex:
+    idx = pd.DatetimeIndex(data.index)
+    return idx.tz_localize(None) if idx.tz is not None else idx
+
+
+def _from(data: PandasData, start) -> PandasData:
+    """Rows of ``data`` on or after ``start`` (compared on naive wall time)."""
+    return data[_naive_index(data) >= start]
+
+
+def _metrics_start(returns: PandasData, benchmark: pd.Series, rf: float):
+    """First date of the window reports.metrics analyses when given a benchmark.
+
+    Replays the same steps reports.metrics takes (drop NaN, align the benchmark
+    to the strategy's dates, then ``_match_dates``) on the same input, so the
+    date is the one its "Start Period" row reports. None if it cannot be found.
+    """
+    from openstatz import reports, utils
+
+    try:
+        r = returns.dropna()
+        if len(r) == 0:
+            return None
+        r = r.copy()
+        r.index = _naive_index(r)
+        b = utils._prepare_benchmark(benchmark, r.index, rf)
+        r, _ = reports._match_dates(r, b)
+        return r.index[0] if len(r) else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def serialize_analysis(
     returns: PandasData,
     benchmark: pd.Series | None = None,
@@ -437,6 +510,21 @@ def serialize_analysis(
         if str(benchmark.name) == str(prim_name) or benchmark.name is None:
             benchmark = benchmark.rename("Benchmark" if prim_name != "Benchmark" else "Benchmark (bm)")
 
+    # The metrics table is computed over the window reports.metrics settles on:
+    # with a benchmark it skips the leading zero returns of both series. Show
+    # the header, charts and tables over that same window, or the page carries
+    # two start dates and two observation counts. The metrics themselves get
+    # the untrimmed input, so they trim exactly once, as they always have.
+    metric_returns, metric_benchmark = returns, benchmark
+    if benchmark is not None:
+        window_start = _metrics_start(returns, benchmark, rf)
+        if window_start is not None:
+            # window_start is a date of `returns` itself, so nothing empties.
+            returns = _from(returns, window_start)
+            primary = _from(primary, window_start)
+            trimmed = _from(benchmark, window_start)
+            benchmark = trimmed if len(trimmed) else benchmark
+
     start = returns.index[0]
     end = returns.index[-1]
 
@@ -452,7 +540,11 @@ def serialize_analysis(
             "has_benchmark": benchmark is not None,
         },
         "metrics": serialize_metrics(
-            returns, benchmark, rf=rf, compounded=compounded, periods_per_year=periods_per_year
+            metric_returns,
+            metric_benchmark,
+            rf=rf,
+            compounded=compounded,
+            periods_per_year=periods_per_year,
         ),
         "series": serialize_series(
             returns,

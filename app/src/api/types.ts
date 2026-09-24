@@ -45,6 +45,8 @@ export interface DrawdownRow {
   days: number | null;
   max_drawdown: number | null;
   drawdown_pct: number | null;
+  /** Still underwater at the last date: `end` is the data's last date, not a recovery. */
+  ongoing?: boolean;
 }
 
 export interface WeeklyCell {

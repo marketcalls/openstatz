@@ -3,7 +3,7 @@
   "info": {
     "title": "OpenStatz API",
     "description": "Portfolio analytics \u2014 library core served as JSON.",
-    "version": "0.1.0"
+    "version": "0.5.0"
   },
   "paths": {
     "/api/health": {
@@ -99,6 +99,82 @@
           }
         }
       }
+    },
+    "/api/compare/symbols": {
+      "post": {
+        "summary": "Compare Symbols",
+        "operationId": "compare_symbols_api_compare_symbols_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompareSymbolsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparisonResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/compare": {
+      "post": {
+        "summary": "Compare",
+        "operationId": "compare_api_compare_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ComparisonResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -144,6 +220,7 @@
               "type": "string"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Dates",
             "description": "Shared date axis (ISO 8601 strings)."
           },
@@ -155,6 +232,7 @@
               "type": "array"
             },
             "type": "object",
+            "minProperties": 1,
             "title": "Returns",
             "description": "Strategy name -> per-date returns (decimal, not %)."
           },
@@ -213,6 +291,194 @@
         "title": "AnalyzeRequest",
         "description": "One or more return series on a shared date axis, plus optional benchmark.\n\nA single key in ``returns`` is a single-strategy analysis; multiple keys is a\nmulti-strategy comparison."
       },
+      "CompareRequest": {
+        "properties": {
+          "dates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Dates",
+            "description": "Shared date axis (ISO 8601)."
+          },
+          "strategies": {
+            "additionalProperties": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "minProperties": 2,
+            "title": "Strategies",
+            "description": "Strategy name -> per-date returns (2+ strategies)."
+          },
+          "rf": {
+            "type": "number",
+            "title": "Rf",
+            "default": 0.0
+          },
+          "compounded": {
+            "type": "boolean",
+            "title": "Compounded",
+            "default": true
+          },
+          "periods_per_year": {
+            "type": "integer",
+            "title": "Periods Per Year",
+            "default": 252
+          },
+          "rolling_window": {
+            "type": "integer",
+            "minimum": 2.0,
+            "title": "Rolling Window",
+            "default": 126
+          }
+        },
+        "type": "object",
+        "required": [
+          "dates",
+          "strategies"
+        ],
+        "title": "CompareRequest",
+        "description": "Compare several custom strategies on a shared date axis."
+      },
+      "CompareSymbolsRequest": {
+        "properties": {
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 2,
+            "title": "Symbols",
+            "description": "Tickers to compare."
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "default": "yfinance"
+          },
+          "period": {
+            "type": "string",
+            "title": "Period",
+            "default": "5y"
+          },
+          "rf": {
+            "type": "number",
+            "title": "Rf",
+            "default": 0.0
+          },
+          "compounded": {
+            "type": "boolean",
+            "title": "Compounded",
+            "default": true
+          },
+          "periods_per_year": {
+            "type": "integer",
+            "title": "Periods Per Year",
+            "default": 252
+          },
+          "rolling_window": {
+            "type": "integer",
+            "minimum": 2.0,
+            "title": "Rolling Window",
+            "default": 126
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbols"
+        ],
+        "title": "CompareSymbolsRequest",
+        "description": "Compare several tickers fetched server-side (e.g. ['AAPL', 'NVDA'])."
+      },
+      "ComparisonResponse": {
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/Meta"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/MetricsTable"
+          },
+          "series": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/components/schemas/SeriesPoint"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Series"
+          }
+        },
+        "type": "object",
+        "required": [
+          "meta",
+          "metrics",
+          "series"
+        ],
+        "title": "ComparisonResponse"
+      },
+      "ConsecutiveLossBin": {
+        "properties": {
+          "length": {
+            "type": "integer",
+            "title": "Length"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "length",
+          "count"
+        ],
+        "title": "ConsecutiveLossBin"
+      },
+      "ConsecutiveLosses": {
+        "properties": {
+          "bins": {
+            "items": {
+              "$ref": "#/components/schemas/ConsecutiveLossBin"
+            },
+            "type": "array",
+            "title": "Bins"
+          },
+          "max": {
+            "type": "integer",
+            "title": "Max"
+          },
+          "avg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bins",
+          "max",
+          "count"
+        ],
+        "title": "ConsecutiveLosses"
+      },
       "DrawdownRow": {
         "properties": {
           "start": {
@@ -259,6 +525,11 @@
               }
             ],
             "title": "Drawdown Pct"
+          },
+          "ongoing": {
+            "type": "boolean",
+            "title": "Ongoing",
+            "default": false
           }
         },
         "type": "object",
@@ -401,6 +672,68 @@
           "value"
         ],
         "title": "HeatmapCell"
+      },
+      "HorizonRow": {
+        "properties": {
+          "horizon": {
+            "type": "string",
+            "title": "Horizon"
+          },
+          "cagr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cagr"
+          },
+          "max_drawdown": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown"
+          },
+          "calmar": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calmar"
+          }
+        },
+        "type": "object",
+        "required": [
+          "horizon"
+        ],
+        "title": "HorizonRow"
+      },
+      "HorizonSummary": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/HorizonRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rows"
+        ],
+        "title": "HorizonSummary"
       },
       "Meta": {
         "properties": {
@@ -636,18 +969,30 @@
           "monthly_heatmap": {
             "$ref": "#/components/schemas/MonthlyHeatmap"
           },
+          "weekly_heatmap": {
+            "$ref": "#/components/schemas/WeeklyHeatmap"
+          },
           "eoy": {
             "$ref": "#/components/schemas/EoyTable"
           },
           "worst_drawdowns": {
             "$ref": "#/components/schemas/DrawdownTable"
+          },
+          "horizon_summary": {
+            "$ref": "#/components/schemas/HorizonSummary"
+          },
+          "consecutive_losses": {
+            "$ref": "#/components/schemas/ConsecutiveLosses"
           }
         },
         "type": "object",
         "required": [
           "monthly_heatmap",
+          "weekly_heatmap",
           "eoy",
-          "worst_drawdowns"
+          "worst_drawdowns",
+          "horizon_summary",
+          "consecutive_losses"
         ],
         "title": "Tables"
       },
@@ -674,6 +1019,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -683,6 +1035,63 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WeeklyCell": {
+        "properties": {
+          "week": {
+            "type": "integer",
+            "title": "Week"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "week",
+          "value",
+          "label"
+        ],
+        "title": "WeeklyCell"
+      },
+      "WeeklyHeatmap": {
+        "properties": {
+          "years": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Years"
+          },
+          "by_year": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/WeeklyCell"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "By Year"
+          }
+        },
+        "type": "object",
+        "required": [
+          "years",
+          "by_year"
+        ],
+        "title": "WeeklyHeatmap"
       }
     }
   }

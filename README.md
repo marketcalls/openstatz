@@ -57,20 +57,30 @@ pip install "openstatz[app]"   # also installs the web app and API
 It works like QuantStats. You only change the import.
 
 ```python
-import openstatz as os
+import openstatz as ostz
 
 returns = my_backtest.returns                 # a pandas Series of daily returns
-benchmark = os.utils.download_returns("SPY")
+benchmark = ostz.utils.download_returns("SPY")
 
-os.reports.html(returns, benchmark=benchmark, output="tearsheet.html")
-os.reports.metrics(returns, mode="full", display=True)
+ostz.reports.html(returns, benchmark=benchmark, output="tearsheet.html")
+ostz.reports.metrics(returns, mode="full", display=True)
 
-os.extend_pandas()
+ostz.extend_pandas()
 returns.sharpe()
 ```
 
-The `qs` alias also works. Note that the `os` alias hides Python's built-in `os` inside files that
-use it, so write `import os as _os` if you need both.
+The examples import it as `ostz`; the `qs` alias also works. Avoid `import openstatz as os`: it
+hides Python's own `os` module, so `os.path` and `os.environ` stop working in that file.
+
+`reports.metrics(..., display=False)` returns the same table QuantStats does, with every number
+rounded to 2 decimals. Percentages are fractions there, so a 13.52% CAGR comes back as 0.14. Pass
+`raw=True` to get every number at full precision instead:
+
+```python
+m = ostz.reports.metrics(returns, benchmark=benchmark, mode="full", display=False, raw=True)
+m.loc["CAGR%"]                 # 0.1352, not 0.14
+m.attrs["percent_rows"]        # which rows are percentages
+```
 
 ## Two ways to make a tearsheet
 
@@ -80,9 +90,9 @@ Both work on a plain `pip install openstatz`, with no `[app]` extra, no server, 
 HTML file with the analysis baked in (charts, heatmaps, metrics, light and dark themes, PDF export):
 
 ```python
-import openstatz as os
+import openstatz as ostz
 
-os.dashboard(returns, benchmark=benchmark, output="report.html")
+ostz.dashboard(returns, benchmark=benchmark, output="report.html")
 ```
 
 The file embeds the data and inlines the JS/CSS, so you can email it or commit it and it just opens.
@@ -91,10 +101,10 @@ The file embeds the data and inlines the JS/CSS, so you can email it or commit i
 template). Use this when you want the familiar QuantStats look or exact upstream parity:
 
 ```python
-import openstatz as os
+import openstatz as ostz
 
-os.reports.html(returns, benchmark=benchmark, output="tearsheet.html")
-os.reports.metrics(returns, mode="full", display=True)
+ostz.reports.html(returns, benchmark=benchmark, output="tearsheet.html")
+ostz.reports.metrics(returns, mode="full", display=True)
 ```
 
 ## Examples for traders
@@ -102,36 +112,36 @@ os.reports.metrics(returns, mode="full", display=True)
 **US market (a stock vs the market).**
 
 ```python
-import openstatz as os
+import openstatz as ostz
 
-aapl = os.utils.download_returns("AAPL")     # or NVDA, MSFT, TSLA, ...
-spy  = os.utils.download_returns("SPY")
+aapl = ostz.utils.download_returns("AAPL")     # or NVDA, MSFT, TSLA, ...
+spy  = ostz.utils.download_returns("SPY")
 
-os.dashboard(aapl, benchmark=spy, output="aapl.html")      # modern tearsheet
-os.reports.html(aapl, benchmark=spy, output="aapl_classic.html")   # classic tearsheet
+ostz.dashboard(aapl, benchmark=spy, output="aapl.html")      # modern tearsheet
+ostz.reports.html(aapl, benchmark=spy, output="aapl_classic.html")   # classic tearsheet
 ```
 
 **Indian market (a stock vs the Nifty 50).**
 
 ```python
-import openstatz as os
+import openstatz as ostz
 
-reliance = os.utils.download_returns("RELIANCE.NS")   # NSE tickers end in .NS
-nifty    = os.utils.download_returns("^NSEI")          # Nifty 50 index
+reliance = ostz.utils.download_returns("RELIANCE.NS")   # NSE tickers end in .NS
+nifty    = ostz.utils.download_returns("^NSEI")          # Nifty 50 index
 
-os.dashboard(reliance, benchmark=nifty, output="reliance.html")
+ostz.dashboard(reliance, benchmark=nifty, output="reliance.html")
 ```
 
 **Your own backtest strategy.** Feed a pandas Series of daily returns straight from your backtest.
 
 ```python
-import openstatz as os
+import openstatz as ostz
 
 returns = my_backtest.returns          # pd.Series of daily returns
-bench   = os.utils.download_returns("SPY")
+bench   = ostz.utils.download_returns("SPY")
 
-os.dashboard(returns, benchmark=bench, output="strategy.html")
-os.reports.metrics(returns, benchmark=bench, mode="full", display=True)
+ostz.dashboard(returns, benchmark=bench, output="strategy.html")
+ostz.reports.metrics(returns, benchmark=bench, mode="full", display=True)
 ```
 
 CSV works too: a `date, return` file (with an optional third benchmark column). Load it with
@@ -201,7 +211,8 @@ Endpoints:
 OpenStatz reuses the QuantStats math without changes, so the results are the same. A test suite
 checks this on every change. It runs the real QuantStats and OpenStatz side by side and fails if any
 number, table, or chart differs (to within 1e-9). It has been verified to match exactly, even on
-live market data.
+live market data. The one deliberate difference is three metric labels written in plain ASCII
+(`CAGR%`, `Sortino/sqrt(2)`, `Smart Sortino/sqrt(2)`); see [docs/parity.md](docs/parity.md).
 
 ```bash
 python tests/parity/generate_fixtures.py   # build the reference output from QuantStats
@@ -211,7 +222,8 @@ pytest tests/parity -q                       # run the check
 ## Data sources
 
 `openstatz.providers` fetches returns for a symbol. yfinance is the default. OpenAlgo is an optional
-source for users on that platform.
+source for users on that platform. It reads from your broker by default, or from the Historify
+database with `source="db"`. See [docs/providers.md](docs/providers.md).
 
 ## Run old QuantStats code unchanged
 

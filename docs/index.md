@@ -14,14 +14,14 @@ pip install "openstatz[app]"     # + FastAPI server and web API
 ## Three usage modes, one codebase
 
 ```python
-import openstatz as os
+import openstatz as ostz
 
 # 1. Drop-in functions
-os.stats.sharpe(returns)
-os.reports.metrics(returns, mode="full", display=True)
+ostz.stats.sharpe(returns)
+ostz.reports.metrics(returns, mode="full", display=True)
 
 # 2. Pandas extension
-os.extend_pandas()
+ostz.extend_pandas()
 returns.sharpe()
 
 # 3. Web app
@@ -29,9 +29,10 @@ returns.sharpe()
 ```
 
 !!! note "Import alias"
-    The documented alias is `os` (`import openstatz as os`), which shadows the stdlib `os`
-    inside files that use it. The QuantStats `qs` alias works too. To run existing QuantStats
-    code unchanged, `openstatz.compat.install_quantstats_shim()` then `import quantstats as qs`.
+    The documented alias is `ostz` (`import openstatz as ostz`). Do not use `os`: it hides the
+    standard-library `os` module in that file, so `os.path` and `os.environ` stop working. The
+    QuantStats `qs` alias works too. To run existing QuantStats code unchanged,
+    `openstatz.compat.install_quantstats_shim()` then `import quantstats as qs`.
 
 ## Why a rebuild?
 
